@@ -45,7 +45,7 @@
             "request": "launch",
             "program": "${workspaceFolder}/build/qemu-aarch64",
             //"args": ["--version"],
-            //"args": ["-machine virt -cpu cortex-a57 -nographic -kernel /home/munden/cryptocap-arm64/main.elf -S -gdb tcp::1234"],
+            //"args": ["-machine virt -cpu cortex-a57 -nographic -kernel ${workspaceFolder}/../tests/${config:qemu.test_file}.elf -S -gdb tcp::1234"],
             "args": [
                 "${workspaceFolder}/../tests/${config:qemu.test_file}",
                 "-one-insn-per-tb", "-d", "in_asm,op,out_asm,cpu,exec", //--"-one-insn-per-tb" is used as "-singlestep" in old versions
