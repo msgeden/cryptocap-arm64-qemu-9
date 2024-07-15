@@ -1,0 +1,11 @@
+{
+    "C_Cpp.default.configurationProvider": "mesonbuild.mesonbuild",
+    "C_Cpp.dimInactiveRegions": false,
+    "files.associations": {
+        "cpregs.h": "c",
+        "*.inc": "c",
+        "*.code": "c",
+        "qemu-main.h": "c"
+    },
+    "qemu.test_file":"test_add_div"
+}

@@ -1,0 +1,73 @@
+{
+    "version": "2.0.0",
+    "tasks": [
+        {
+            "label": "configure QEMU",
+            "type": "shell",
+            "command": "../configure",
+            "args": [
+                "--target-list=aarch64-softmmu, aarch64-linux-user",
+                "--enable-debug",
+                "--enable-debug-tcg",
+                "--enable-tcg-interpreter",
+                "--enable-trace-backends=simple"
+            ],
+            "options": {
+                "cwd": "${workspaceFolder}/build"
+            },
+            "group": {
+                "kind": "build",
+                "isDefault": false
+            },
+            "problemMatcher": []
+        },
+        {
+            "label": "build QEMU",
+            "type": "shell",
+            "command": "make",
+            "args": [
+                "-j8"
+            ],
+            "options": {
+                "cwd": "${workspaceFolder}/build"
+            },
+            "group": {
+                "kind": "build",
+                "isDefault": true
+            },
+            "problemMatcher": ["$gcc"]
+        },
+		{
+            "label": "run QEMU (System)",
+            "type": "shell",
+            "command": "${workspaceFolder}/build/qemu-system-aarch64",
+            "args": [
+              "-machine", "virt",
+              "-cpu", "cortex-a57",
+              "-nographic",
+              "-kernel", "${workspaceFolder}/../tests/${config:qemu.test_file}.elf",
+              "-one-insn-per-tb", "-d", "in_asm,op,out_asm,cpu,exec", "-D", "${workspaceFolder}/../logs/qemu-system-aarch64-${config:qemu.test_file}.log",
+            ],
+            "group": {
+                "kind": "test",
+                "isDefault": true
+            },
+            "problemMatcher": []
+        },
+        {
+            "label": "run QEMU (User)",
+            "type": "shell",
+            "command": "${workspaceFolder}/build/qemu-aarch64",
+            "args": [
+             "${workspaceFolder}/../tests/${config:qemu.test_file}",
+             "-one-insn-per-tb", "-d", "in_asm,op,out_asm,cpu,exec", "-D", "${workspaceFolder}/../logs/qemu-user-aarch64-${config:qemu.test_file}.log",
+
+            ],
+            "group": {
+                "kind": "test",
+                "isDefault": true
+            },
+            "problemMatcher": []
+        }
+    ]
+}
