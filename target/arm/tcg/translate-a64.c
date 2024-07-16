@@ -4692,6 +4692,74 @@ static void disas_logic_reg(DisasContext *s, uint32_t insn)
     }
 }
 
+#ifdef TARGET_CRYPTO_CAP
+/*
+ * Add and multiply by power-of-two immediate
+    31 30 28  25     20   15    10     5     0
+     +----+----+-----+-----+-----+-----+-----+
+     |....|0001|00101| imm |  Rm |  Rn |  Rd |
+     +----+----+-----+-----+-----+-----+-----+
+     0000 0001 00101 00011 00001 00010 00011
+--------+-----+--+-------+---------+------+------+
+ */
+static void disas_add_mult(DisasContext *s, uint32_t insn)
+{
+    int rd = extract32(insn, 0, 5);
+    int rn = extract32(insn, 5, 5);
+    int rm = extract32(insn, 10, 5);
+    int imm5 = extract32(insn, 15, 5);
+        
+    if (rd == 31 || rn == 31 || rm == 31) {
+        unallocated_encoding(s);
+        return;
+    }
+
+    TCGv_i64 tcg_rd, tcg_rn, tcg_rm, tcg_tmp1, tcg_tmp2;
+    
+    tcg_rd = cpu_reg(s, rd);
+    tcg_rm = cpu_reg(s, rn);
+    tcg_rn = cpu_reg(s, rm);
+    tcg_tmp1 = tcg_temp_new_i64();
+    tcg_tmp2 = tcg_temp_new_i64();
+    
+    tcg_gen_add_i64(tcg_tmp1, tcg_rm, tcg_rn);
+    tcg_gen_shri_i64(tcg_tmp2, tcg_tmp1, imm5);
+    tcg_gen_mov_i64(tcg_rd, tcg_tmp2);
+}
+/*
+ * Add and multiply by power-of-two immediate
+    31 30 28  25     20   15    10     5     0
+     +----+----+-----+-----+-----+-----+-----+
+     |....|0001|00110| imm |  Rm |  Rn |  Rd |
+     +----+----+-----+-----+-----+-----+-----+
+     0000 0001 00110 00011 00001 00010 00011
+--------+-----+--+-------+---------+------+------+
+ */
+static void disas_add_div(DisasContext *s, uint32_t insn)
+{
+    int rd = extract32(insn, 0, 5);
+    int rn = extract32(insn, 5, 5);
+    int rm = extract32(insn, 10, 5);
+    int imm5 = extract32(insn, 15, 5);
+   
+    if (rd == 31 || rn == 31 || rm == 31) {
+        unallocated_encoding(s);
+        return;
+    }
+    
+    TCGv_i64 tcg_rd, tcg_rn, tcg_rm, tcg_tmp1, tcg_tmp2;
+    
+    tcg_rd = cpu_reg(s, rd);
+    tcg_rm = cpu_reg(s, rn);
+    tcg_rn = cpu_reg(s, rm);
+    tcg_tmp1 = tcg_temp_new_i64();
+    tcg_tmp2 = tcg_temp_new_i64();
+    
+    tcg_gen_add_i64(tcg_tmp1, tcg_rm, tcg_rn);
+    tcg_gen_shli_i64(tcg_tmp2, tcg_tmp1, imm5);
+    tcg_gen_mov_i64(tcg_rd, tcg_tmp2);
+}
+#endif
 /*
  * Add/subtract (extended register)
  *
@@ -14063,6 +14131,16 @@ static void disas_a64_legacy(DisasContext *s, uint32_t insn)
     case 0xf:      /* Data processing - SIMD and floating point */
         disas_data_proc_simd_fp(s, insn);
         break;
+#ifdef TARGET_CRYPTO_CAP
+    case 0x1: //25-29
+        switch (extract32(insn, 20, 5))
+        case 0x5:  //20-25
+            disas_add_mult(s, insn);
+            break;
+        case 0x6:  //20-25
+            disas_add_div(s, insn);
+            break;
+#endif
     default:
         unallocated_encoding(s);
         break;
