@@ -1651,6 +1651,14 @@ TCGv_i64 tcg_global_mem_new_i64(TCGv_ptr reg, intptr_t off, const char *name)
     return temp_tcgv_i64(ts);
 }
 
+//TARGET_CRYPTO_CAP
+TCGv_vec tcg_global_mem_new_vec(TCGv_ptr reg, intptr_t off, const char *name)
+{
+    TCGTemp *ts = tcg_global_mem_new_internal(reg, off, name, TCG_TYPE_V256);
+    return temp_tcgv_vec(ts);
+}
+//TARGET_CRYPTO_CAP
+
 TCGv_ptr tcg_global_mem_new_ptr(TCGv_ptr reg, intptr_t off, const char *name)
 {
     TCGTemp *ts = tcg_global_mem_new_internal(reg, off, name, TCG_TYPE_PTR);

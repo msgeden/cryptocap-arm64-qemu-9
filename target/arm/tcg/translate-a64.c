@@ -40,6 +40,13 @@ static const char *regnames[] = {
     "x24", "x25", "x26", "x27", "x28", "x29", "lr", "sp"
 };
 
+//#ifdef TARGET_CRYPTO_CAP
+static TCGv_vec cpu_C[CAPREG_SIZE];
+static const char *capregnames[] = {
+    "cr0", "cr1", "cr2", "cr3", "cr4", "cr5", "cr6", "cr7"
+};
+//#endif
+
 enum a64_shift_type {
     A64_SHIFT_TYPE_LSL = 0,
     A64_SHIFT_TYPE_LSR = 1,
@@ -75,6 +82,9 @@ static int scale_by_log2_tag_granule(DisasContext *s, int x)
 
 #include "decode-sme-fa64.c.inc"
 #include "decode-a64.c.inc"
+//#ifdef TARGET_CRPYTO_CAP
+#include "decode-cryptocap.c.inc"
+//#endif
 
 /* Table based decoder typedefs - used when the relevant bits for decode
  * are too awkwardly scattered across the instruction (eg SIMD).
@@ -100,6 +110,13 @@ void a64_translate_init(void)
                                           offsetof(CPUARMState, xregs[i]),
                                           regnames[i]);
     }
+    //#ifdef TARGET_CRYPTO_CAP
+    for (i = 0; i < CAPREG_SIZE; i++) {
+        cpu_C[i] = tcg_global_mem_new_vec(tcg_env,
+                                          offsetof(CPUARMState, cregs[i]),
+                                          capregnames[i]);
+    }
+    //#end
 
     cpu_exclusive_high = tcg_global_mem_new_i64(tcg_env,
         offsetof(CPUARMState, exclusive_high), "exclusive_high");
@@ -1366,6 +1383,19 @@ static inline AArch64DecodeFn *lookup_disas_fn(const AArch64DecodeTable *table,
     }
     return NULL;
 }
+
+//#ifdef TARGET_CRYPTO_CAP
+static bool trans_CSETBASE(DisasContext *s, arg_CSETBASE *a)
+{
+    TCGv CRs = tcg_temp_new();
+    TCGv CRd = tcg_temp_new();
+    TCGv Rs = tcg_temp_new_i64();
+    tcg_gen_mov_i64(Rs,  cpu_X[a->rs]);
+    //tcg_gen_mov_vec(CRs, cpu_C[a->crs]);
+    //tcg_gen_mov_vec(CRd, cpu_C[a->crd]);
+    return true;
+}
+//#endif 
 
 /*
  * The instruction disassembly implemented here matches
@@ -4692,74 +4722,93 @@ static void disas_logic_reg(DisasContext *s, uint32_t insn)
     }
 }
 
-#ifdef TARGET_CRYPTO_CAP
-/*
- * Add and multiply by power-of-two immediate
-    31 30 28  25     20   15    10     5     0
-     +----+----+-----+-----+-----+-----+-----+
-     |....|0001|00101| imm |  Rm |  Rn |  Rd |
-     +----+----+-----+-----+-----+-----+-----+
-     0000 0001 00101 00011 00001 00010 00011
---------+-----+--+-------+---------+------+------+
- */
-static void disas_add_mult(DisasContext *s, uint32_t insn)
-{
-    int rd = extract32(insn, 0, 5);
-    int rn = extract32(insn, 5, 5);
-    int rm = extract32(insn, 10, 5);
-    int imm5 = extract32(insn, 15, 5);
+// #ifdef TARGET_CRYPTO_CAP
+// /*
+//  * Add and multiply by power-of-two immediate
+//     31 30 28  25     20   15    10     5     0
+//      +----+----+-----+-----+-----+-----+-----+
+//      |....|0001|00101| imm |  Rm |  Rn |  Rd |
+//      +----+----+-----+-----+-----+-----+-----+
+//      0000 0001 00101 00011 00001 00010 00011
+// --------+-----+--+-------+---------+------+------+
+//  */
+// static void disas_add_mult(DisasContext *s, uint32_t insn)
+// {
+//     int rd = extract32(insn, 0, 5);
+//     int rn = extract32(insn, 5, 5);
+//     int rm = extract32(insn, 10, 5);
+//     int imm5 = extract32(insn, 15, 5);
         
-    if (rd == 31 || rn == 31 || rm == 31) {
-        unallocated_encoding(s);
-        return;
-    }
+//     if (rd == 31 || rn == 31 || rm == 31) {
+//         unallocated_encoding(s);
+//         return;
+//     }
 
-    TCGv_i64 tcg_rd, tcg_rn, tcg_rm, tcg_tmp1, tcg_tmp2;
+//     TCGv_i64 tcg_rd, tcg_rn, tcg_rm, tcg_tmp1, tcg_tmp2;
     
-    tcg_rd = cpu_reg(s, rd);
-    tcg_rm = cpu_reg(s, rn);
-    tcg_rn = cpu_reg(s, rm);
-    tcg_tmp1 = tcg_temp_new_i64();
-    tcg_tmp2 = tcg_temp_new_i64();
+//     tcg_rd = cpu_reg(s, rd);
+//     tcg_rm = cpu_reg(s, rn);
+//     tcg_rn = cpu_reg(s, rm);
+//     tcg_tmp1 = tcg_temp_new_i64();
+//     tcg_tmp2 = tcg_temp_new_i64();
     
-    tcg_gen_add_i64(tcg_tmp1, tcg_rm, tcg_rn);
-    tcg_gen_shri_i64(tcg_tmp2, tcg_tmp1, imm5);
-    tcg_gen_mov_i64(tcg_rd, tcg_tmp2);
-}
-/*
- * Add and multiply by power-of-two immediate
-    31 30 28  25     20   15    10     5     0
-     +----+----+-----+-----+-----+-----+-----+
-     |....|0001|00110| imm |  Rm |  Rn |  Rd |
-     +----+----+-----+-----+-----+-----+-----+
-     0000 0001 00110 00011 00001 00010 00011
---------+-----+--+-------+---------+------+------+
- */
-static void disas_add_div(DisasContext *s, uint32_t insn)
-{
-    int rd = extract32(insn, 0, 5);
-    int rn = extract32(insn, 5, 5);
-    int rm = extract32(insn, 10, 5);
-    int imm5 = extract32(insn, 15, 5);
+//     tcg_gen_add_i64(tcg_tmp1, tcg_rm, tcg_rn);
+//     tcg_gen_shri_i64(tcg_tmp2, tcg_tmp1, imm5);
+//     tcg_gen_mov_i64(tcg_rd, tcg_tmp2);
+// }
+// /*
+//  * Add and multiply by power-of-two immediate
+//     31 30 28  25     20   15    10     5     0
+//      +----+----+-----+-----+-----+-----+-----+
+//      |....|0001|00110| imm |  Rm |  Rn |  Rd |
+//      +----+----+-----+-----+-----+-----+-----+
+//      0000 0001 00110 00011 00001 00010 00011
+// --------+-----+--+-------+---------+------+------+
+//  */
+// static void disas_add_div(DisasContext *s, uint32_t insn)
+// {
+//     int rd = extract32(insn, 0, 5);
+//     int rn = extract32(insn, 5, 5);
+//     int rm = extract32(insn, 10, 5);
+//     int imm5 = extract32(insn, 15, 5);
    
-    if (rd == 31 || rn == 31 || rm == 31) {
-        unallocated_encoding(s);
-        return;
-    }
+//     if (rd == 31 || rn == 31 || rm == 31) {
+//         unallocated_encoding(s);
+//         return;
+//     }
     
-    TCGv_i64 tcg_rd, tcg_rn, tcg_rm, tcg_tmp1, tcg_tmp2;
+//     TCGv_i64 tcg_rd, tcg_rn, tcg_rm, tcg_tmp1, tcg_tmp2;
     
-    tcg_rd = cpu_reg(s, rd);
-    tcg_rm = cpu_reg(s, rn);
-    tcg_rn = cpu_reg(s, rm);
-    tcg_tmp1 = tcg_temp_new_i64();
-    tcg_tmp2 = tcg_temp_new_i64();
+//     tcg_rd = cpu_reg(s, rd);
+//     tcg_rm = cpu_reg(s, rn);
+//     tcg_rn = cpu_reg(s, rm);
+//     tcg_tmp1 = tcg_temp_new_i64();
+//     tcg_tmp2 = tcg_temp_new_i64();
     
-    tcg_gen_add_i64(tcg_tmp1, tcg_rm, tcg_rn);
-    tcg_gen_shli_i64(tcg_tmp2, tcg_tmp1, imm5);
-    tcg_gen_mov_i64(tcg_rd, tcg_tmp2);
-}
-#endif
+//     tcg_gen_add_i64(tcg_tmp1, tcg_rm, tcg_rn);
+//     tcg_gen_shli_i64(tcg_tmp2, tcg_tmp1, imm5);
+//     tcg_gen_mov_i64(tcg_rd, tcg_tmp2);
+// }
+
+// // static void trans_set_ccreg_base(DisasContext *s, uint32_t insn)
+// // {
+// //     int reg = (insn >> 0) & 0x1f;  // Source register
+// //     TCGv_i64 t0 = tcg_tempendif_new_i64();
+// //     tcg_gen_mov_i64(t0, cpu_gpr[reg]);
+// //     tcg_gen_st_i64(t0, cpu_env, offsetof(CPUARMState, crypto_cap.base_offset));
+// //     tcg_temp_free_i64(t0);
+// // }
+
+// // static void trans_get_ccreg_base(DisasContext *s, uint32_t insn)
+// // {
+// //     int reg = (insn >> 0) & 0x1f;  // Destination register
+// //     TCGv_i64 t0 = tcg_temp_new_i64();
+// //     tcg_gen_ld_i64(t0, cpu_env, offsetof(CPUARMState, crypto_cap.base_offset));
+// //     tcg_gen_mov_i64(cpu_gpr[reg], t0);
+// //     tcg_temp_free_i64(t0);
+// // }
+
+// #endif
 /*
  * Add/subtract (extended register)
  *
@@ -14131,16 +14180,16 @@ static void disas_a64_legacy(DisasContext *s, uint32_t insn)
     case 0xf:      /* Data processing - SIMD and floating point */
         disas_data_proc_simd_fp(s, insn);
         break;
-#ifdef TARGET_CRYPTO_CAP
-    case 0x1: //25-29
-        switch (extract32(insn, 20, 5))
-        case 0x5:  //20-25
-            disas_add_mult(s, insn);
-            break;
-        case 0x6:  //20-25
-            disas_add_div(s, insn);
-            break;
-#endif
+// #ifdef TARGET_CRYPTO_CAP
+//     case 0x1: //25-29
+//         switch (extract32(insn, 20, 5))
+//         case 0x5:  //20-25
+//             disas_add_mult(s, insn);
+//             break;
+//         case 0x6:  //20-25
+//             disas_add_div(s, insn);
+//             break;
+// #endif
     default:
         unallocated_encoding(s);
         break;
@@ -14304,7 +14353,7 @@ static void aarch64_tr_translate_insn(DisasContextBase *dcbase, CPUState *cpu)
     insn = arm_ldl_code(env, &s->base, pc, s->sctlr_b);
     s->insn = insn;
     s->base.pc_next = pc + 4;
-
+        
     s->fp_access_checked = false;
     s->sve_access_checked = false;
 
@@ -14360,7 +14409,11 @@ static void aarch64_tr_translate_insn(DisasContextBase *dcbase, CPUState *cpu)
 
     if (!disas_a64(s, insn) &&
         !disas_sme(s, insn) &&
-        !disas_sve(s, insn)) {
+        !disas_sve(s, insn) 
+// #ifdef TARGET_CRYPTO_CAP
+        && !disas_cryptocap(s, insn)
+// #endif        
+        ) {
         disas_a64_legacy(s, insn);
     }
 

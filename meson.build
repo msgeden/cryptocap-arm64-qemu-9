@@ -610,6 +610,11 @@ warn_flags = [
   '-Wno-string-plus-int',
   '-Wno-tautological-type-limit-compare',
   '-Wno-typedef-redefinition',
+  #TARGET_CRYPTO_CAP
+  '-Wno-unused-function',
+  '-Wno-unused-variable',
+  '-Wno-unused-label',
+  '-Wno-missing-prototypes',
 ]
 
 if host_os != 'darwin'

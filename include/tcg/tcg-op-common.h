@@ -27,6 +27,9 @@ TCGv_vec tcg_temp_new_vec_matching(TCGv_vec match);
 TCGv_i32 tcg_global_mem_new_i32(TCGv_ptr reg, intptr_t off, const char *name);
 TCGv_i64 tcg_global_mem_new_i64(TCGv_ptr reg, intptr_t off, const char *name);
 TCGv_ptr tcg_global_mem_new_ptr(TCGv_ptr reg, intptr_t off, const char *name);
+//TARGET_CRYPTO_CAP
+TCGv_vec tcg_global_mem_new_vec(TCGv_ptr reg, intptr_t off, const char *name);
+//TARGET_CRYPTO_CAP
 
 /* Generic ops.  */
 

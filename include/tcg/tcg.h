@@ -244,6 +244,8 @@ typedef enum TCGType {
     TCG_TYPE_I64,
     TCG_TYPE_I128,
 
+    TCG_TYPE_C256,
+
     TCG_TYPE_V64,
     TCG_TYPE_V128,
     TCG_TYPE_V256,
@@ -341,6 +343,9 @@ typedef tcg_target_ulong TCGArg;
 typedef struct TCGv_i32_d *TCGv_i32;
 typedef struct TCGv_i64_d *TCGv_i64;
 typedef struct TCGv_i128_d *TCGv_i128;
+// #ifdef TARGET_CRYPTO_CAP
+// typedef struct TCGv_c256 *TCGv_c256;
+// #endif
 typedef struct TCGv_ptr_d *TCGv_ptr;
 typedef struct TCGv_vec_d *TCGv_vec;
 typedef TCGv_ptr TCGv_env;

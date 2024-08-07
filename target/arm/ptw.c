@@ -574,6 +574,7 @@ static bool S1_ptw_translate(CPUARMState *env, S1Translate *ptw,
         ptw->out_space = s2.f.attrs.space;
     } else {
 #ifdef CONFIG_TCG
+        //TARGET_CRYPTO_CAP:  check TLB first 
         CPUTLBEntryFull *full;
         int flags;
 

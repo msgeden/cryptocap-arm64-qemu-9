@@ -77,6 +77,19 @@ static vaddr arm_cpu_get_pc(CPUState *cs)
     }
 }
 
+// #ifdef TARGET_CRYPTO_CAP
+// static void set_crypto_cap(CPUState *cs, capreg *value, int idx) {
+//     ARMCPU *cpu = ARM_CPU(cs);
+//     CPUARMState *env = &cpu->env;
+//     env->ccregs[idx] = value;
+// }
+// static capreg get_crypto_cap(CPUState *cs, int idx) {
+//     ARMCPU *cpu = ARM_CPU(cs);
+//     CPUARMState *env = &cpu->env;
+//     return env->ccregs[idx];
+// }
+// #endif
+
 #ifdef CONFIG_TCG
 void arm_cpu_synchronize_from_tb(CPUState *cs,
                                  const TranslationBlock *tb)
@@ -1078,8 +1091,17 @@ static void aarch64_cpu_dump_state(CPUState *cs, FILE *f, int flags)
             qemu_fprintf(f, "X%02d=%016" PRIx64 "%s", i, env->xregs[i],
                          (i + 2) % 3 ? " " : "\n");
         }
+     
     }
-
+    
+//#ifdef TARGET_CRYPTO_CAP
+    for (i = 0; i < CAPREG_SIZE; i++) {    
+        qemu_fprintf(f, "CR%01d.base=%016" PRIx64 ":.offset=%016" PRIx32 ":.size=%016" PRIx32 ":.perms=%016" PRIx16 ":.PT=%016" PRIx64 ":.MAC=%016" PRIx64 "%s" , i, 
+        (uint64_t)env->cregs[i].base, env->cregs[i].offset, env->cregs[i].size, env->cregs[i].perms, env->cregs[i].PT, env->cregs[i].MAC,
+        "\n");
+    }
+//#endif
+            
     if (arm_feature(env, ARM_FEATURE_EL3) && el != 3) {
         ns_status = env->cp15.scr_el3 & SCR_NS ? "NS " : "S ";
     } else {

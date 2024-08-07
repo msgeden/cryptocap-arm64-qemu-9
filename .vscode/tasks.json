@@ -56,12 +56,40 @@
             "problemMatcher": []
         },
         {
+            "label": "run QEMU (System) Rasperry Pi 3B 64-bit",
+            "type": "shell",
+            "command": "${workspaceFolder}/build/qemu-system-aarch64",
+            "args": [
+              "-M", "raspi3b",
+              "-cpu", "cortex-a72",
+              "-append", "rw earlyprintk loglevel=8 console=ttyAMA0,115200 dwc_otg.lpm_enable=0 root=/dev/mmcblk0p2 rootdelay=1",
+              "-dtb", "${workspaceFolder}/../images/raspi/bcm2710-rpi-3-b-plus.dtb",
+              "-sd", "${workspaceFolder}/../images/raspi/disk.img",
+              "-kernel", "${workspaceFolder}/../images/raspi/kernel8.img",
+              "-m", "1G",
+              "-smp", "4",
+              "-serial", "stdio", 
+              //"-usb", "-device", "usb-mouse", "-device", "usb-kbd",
+              //"-device", "usb-net,netdev=net0",
+              //"-netdev", "user,id=net0,hostfwd=tcp::5555-:22"
+              //"-nographic",
+              //"-d", "in_asm,op,out_asm,cpu,fpu,mmu,int,exec", //--"-one-insn-per-tb" is used as "-singlestep" in old versions
+              //"-D", "${workspaceFolder}/../logs/qemu-system-aarch64-pi3.log",
+              //"-kernel", "${workspaceFolder}/../tests/${config:qemu.test_file}",
+            ],
+            "group": {
+                "kind": "test",
+                "isDefault": true
+            },
+            "problemMatcher": []
+        },
+        {
             "label": "run QEMU (User)",
             "type": "shell",
             "command": "${workspaceFolder}/build/qemu-aarch64",
             "args": [
              "-one-insn-per-tb", 
-             "-d", "in_asm,op,out_asm,cpu,exec", 
+             "-d", "in_asm,op,out_asm,cpu,fpu,mmu,int,exec", 
              "-D", "${workspaceFolder}/../logs/qemu-user-aarch64-${config:qemu.test_file}.log",
              "${workspaceFolder}/../tests/${config:qemu.test_file}",
             ],

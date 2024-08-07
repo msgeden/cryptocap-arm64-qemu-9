@@ -5,7 +5,15 @@
         "cpregs.h": "c",
         "*.inc": "c",
         "*.code": "c",
-        "qemu-main.h": "c"
+        "qemu-main.h": "c",
+        "compare": "c",
+        "cstdint": "c",
+        "*.idef": "c",
+        "*.def": "c",
+        "cpu-defs.h": "c",
+        "array": "c",
+        "string_view": "c",
+        "initializer_list": "c"
     },
-    "qemu.test_file":"test_add_div"
+    "qemu.test_file":"test_csetbase"
 }

@@ -1,0 +1,30 @@
+# AArch64 CRPYTOCAP allowed instruction decoding
+#
+#  Copyright (c) 2023 Linaro, Ltd
+#
+# This library is free software; you can redistribute it and/or
+# modify it under the terms of the GNU Lesser General Public
+# License as published by the Free Software Foundation; either
+# version 2.1 of the License, or (at your option) any later version.
+#
+# This library is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
+# Lesser General Public License for more details.
+#
+# You should have received a copy of the GNU Lesser General Public
+# License along with this library; if not, see <http://www.gnu.org/licenses/>.
+
+#
+# This file is processed by scripts/decodetree.py
+#
+
+#FORMATS
+#format for capability manipulation instructions 
+&crd_crs_rs crd crs rs      
+
+#OPERATION TYPES
+@op_crd_crs_rs           ... .... ..... ..... crd:5 crs:5 rs:5 &crd_crs_rs
+
+#INSTRUCTIONS
+CSETBASE 000 0001 00101 00000 ..... ..... .....  @op_crd_crs_rs

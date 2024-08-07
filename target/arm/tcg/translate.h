@@ -585,7 +585,8 @@ static inline TCGv_ptr fpstatus_ptr(ARMFPStatusFlavour flavour)
  * @atom: atomicity of the memory operation
  *
  * Build the complete MemOp for a memory operation, including alignment,
- * endianness, and atomicity.
+ * endianness, and atomici    tcg_gen_qemu_st_i64(source, tcg_addr, memidx, memop);
+ty.
  *
  * If (op & MO_AMASK) then the operation already contains the required
  * alignment, e.g. for AccType_ATOMIC.  Otherwise, this an optionally

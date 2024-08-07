@@ -37,6 +37,11 @@
 #define KVM_HAVE_MCE_INJECTION 1
 #endif
 
+//#ifdef TARGET_CRYPTO_CAP
+#define CAPREG_SIZE 8
+//#endif
+
+
 #define EXCP_UDEF            1   /* undefined instruction */
 #define EXCP_SWI             2   /* software interrupt */
 #define EXCP_PREFETCH_ABORT  3
@@ -188,6 +193,18 @@ typedef struct ARMPACKey {
 } ARMPACKey;
 #endif
 
+
+//#ifdef TARGET_CRYPTO_CAP
+typedef struct __attribute__((packed)) capreg {
+     uint64_t base: 48;
+     uint32_t offset: 32;
+     uint32_t size: 32;
+     uint16_t perms: 16;
+     uint64_t PT: 64;
+     uint64_t MAC: 64;
+     } capreg;
+//#endif
+
 /* See the commentary above the TBFLAG field definitions.  */
 typedef struct CPUARMTBFlags {
     uint32_t flags;
@@ -209,6 +226,11 @@ typedef struct CPUArchState {
     /* Regs for A64 mode.  */
     uint64_t xregs[32];
     uint64_t pc;
+
+//#ifdef TARGET_CRYPTO_CAP
+    capreg cregs[8];
+//#endif
+
     /* PSTATE isn't an architectural register for ARMv8. However, it is
      * convenient for us to assemble the underlying state into a 32 bit format
      * identical to the architectural format used for the SPSR. (This is also
