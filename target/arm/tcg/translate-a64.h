@@ -187,9 +187,9 @@ static inline TCGv_ptr pred_full_reg_ptr(DisasContext *s, int regno)
 bool disas_sve(DisasContext *, uint32_t);
 bool disas_sme(DisasContext *, uint32_t);
 
-#ifdef TARGET_CRYPTO_CAP
+//#ifdef TARGET_CRYPTO_CAP
 bool disas_cryptocap(DisasContext *, uint32_t);
-#endif
+//#endif
 
 void gen_gvec_rax1(unsigned vece, uint32_t rd_ofs, uint32_t rn_ofs,
                    uint32_t rm_ofs, uint32_t opr_sz, uint32_t max_sz);

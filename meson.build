@@ -615,6 +615,7 @@ warn_flags = [
   '-Wno-unused-variable',
   '-Wno-unused-label',
   '-Wno-missing-prototypes',
+  '-Wno-unused-but-set-variable',
 ]
 
 if host_os != 'darwin'

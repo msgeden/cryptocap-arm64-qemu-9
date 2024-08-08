@@ -41,7 +41,10 @@ static const char *regnames[] = {
 };
 
 //#ifdef TARGET_CRYPTO_CAP
-static TCGv_vec cpu_C[CAPREG_SIZE];
+typedef struct TCGv_i64_x4 {
+    TCGv_i64 parts[4];
+} TCGv_i64_x4;
+static TCGv_i64_x4 cpu_C[CAPREG_SIZE];
 static const char *capregnames[] = {
     "cr0", "cr1", "cr2", "cr3", "cr4", "cr5", "cr6", "cr7"
 };
@@ -112,9 +115,13 @@ void a64_translate_init(void)
     }
     //#ifdef TARGET_CRYPTO_CAP
     for (i = 0; i < CAPREG_SIZE; i++) {
-        cpu_C[i] = tcg_global_mem_new_vec(tcg_env,
-                                          offsetof(CPUARMState, cregs[i]),
-                                          capregnames[i]);
+        for (int j = 0; j < 4; j++) {
+            char name[12];
+            snprintf(name, sizeof(name), "c%d_%d", i, j);
+            cpu_C[i].parts[j] = tcg_global_mem_new_i64(tcg_env,
+                                          offsetof(CPUARMState, cregs[i].fields[j]),
+                                          name);
+        }
     }
     //#end
 
@@ -562,6 +569,16 @@ TCGv_i64 cpu_reg(DisasContext *s, int reg)
     } else {
         return cpu_X[reg];
     }
+}
+
+TCGv_i64_x4 cpu_creg(DisasContext *s, int reg)
+{
+    return cpu_C[reg];
+}
+
+TCGv_i64 cpu_creg_part(DisasContext *s, int reg, int part)
+{
+    return cpu_C[reg].parts[part];
 }
 
 /* register access for when 31 == SP */
@@ -1385,14 +1402,47 @@ static inline AArch64DecodeFn *lookup_disas_fn(const AArch64DecodeTable *table,
 }
 
 //#ifdef TARGET_CRYPTO_CAP
+static bool trans_CMANIP(DisasContext *s, arg_CMANIP *a)
+{
+    int idx=a->imm;
+    if (idx >= 4)  
+        return false;
+    TCGv_i64 Rs = cpu_X[a->rs];
+    TCGv_i64_x4 CRd = cpu_C[a->crd];
+    tcg_gen_mov_i64(cpu_C[a->crd].parts[idx], Rs);
+    return true;
+}
+static bool trans_CMOV(DisasContext *s, arg_CMOV *a)
+{
+    for (int i=0; i<4; i++)
+        tcg_gen_mov_i64(cpu_C[a->crd].parts[i], cpu_C[a->crs].parts[i]);
+    return true;
+}
 static bool trans_CSETBASE(DisasContext *s, arg_CSETBASE *a)
 {
-    TCGv CRs = tcg_temp_new();
-    TCGv CRd = tcg_temp_new();
-    TCGv Rs = tcg_temp_new_i64();
-    tcg_gen_mov_i64(Rs,  cpu_X[a->rs]);
-    //tcg_gen_mov_vec(CRs, cpu_C[a->crs]);
-    //tcg_gen_mov_vec(CRd, cpu_C[a->crd]);
+    //TCGv_vec CRs = tcg_temp_new_vec(TCG_TYPE_V256);
+    //TCGv_vec CRd = tcg_temp_new_vec(TCG_TYPE_V256);
+    TCGv_i64 Rs = cpu_X[a->rs];
+    TCGv_i64_x4 CRd = cpu_C[a->crs];
+    //TCGv_i64 CRs;
+    //tcg_gen_mov_i64(CRs,  cpu_X[a->CRs]);
+    //tcg_gen_mov_i64(cpu_X[a->crd], Rs  );
+    tcg_gen_mov_i64(cpu_C[a->crd].parts[0], Rs  );
+
+    //TCGv_ptr creg_ptr = tcg_temp_new_ptr();
+    //tcg_gen_addi_ptr(creg_ptr, cpu_env, offsetof(CPUARMState, cregs[creg_num]));
+
+    // Store the 64-bit GPR value in the first 64 bits of the capreg
+    //tcg_gen_st_i64(gpr_value, creg_ptr, offsetof(capreg, cap[0]));
+
+    // for (int i = 0; i < 4; i++) {
+    //     CRd.parts[i] = CRs.parts[i];
+    // }
+    // CRd.parts[0]=Rs;
+
+    //...
+ 
+    //...
     return true;
 }
 //#endif 

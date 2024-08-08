@@ -21,10 +21,19 @@
 
 #FORMATS
 #format for capability manipulation instructions 
+&imm_crd_rs imm crd rs  
+&crd_crs crd crs
 &crd_crs_rs crd crs rs      
 
 #OPERATION TYPES
+@op_imm_crd_rs           ... .... ..... ..... .. imm:3 crd:5 rs:5 &imm_crd_rs
+@op_crd_crs              ... .... ..... ..... ..... crd:5 crs:5 &crd_crs
 @op_crd_crs_rs           ... .... ..... ..... crd:5 crs:5 rs:5 &crd_crs_rs
 
+
 #INSTRUCTIONS
-CSETBASE 000 0001 00101 00000 ..... ..... .....  @op_crd_crs_rs
+#a generic capability register manipulation instruction based on index (imm)
+CMANIP      000 0001 01111 00000 00 ... ..... .....  @op_imm_crd_rs
+CMOV        000 0001 10000 00000 00000 ..... .....  @op_crd_crs
+CSETBASE    000 0001 00101 00000 ..... ..... .....  @op_crd_crs_rs
+

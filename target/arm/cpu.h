@@ -194,16 +194,20 @@ typedef struct ARMPACKey {
 #endif
 
 
-//#ifdef TARGET_CRYPTO_CAP
-typedef struct __attribute__((packed)) capreg {
-     uint64_t base: 48;
-     uint32_t offset: 32;
-     uint32_t size: 32;
-     uint16_t perms: 16;
-     uint64_t PT: 64;
-     uint64_t MAC: 64;
+// //#ifdef TARGET_CRYPTO_CAP
+// typedef struct __attribute__((packed)) capreg {
+//      uint64_t base: 48;
+//      uint32_t offset: 32;
+//      uint32_t size: 32;
+//      uint16_t perms: 16;
+//      uint64_t PT: 64;
+//      uint64_t MAC: 64;
+//      } capreg;
+// //#endif
+
+typedef struct capreg {
+     uint64_t fields[4];
      } capreg;
-//#endif
 
 /* See the commentary above the TBFLAG field definitions.  */
 typedef struct CPUARMTBFlags {
