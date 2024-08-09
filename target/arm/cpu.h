@@ -39,6 +39,7 @@
 
 //#ifdef TARGET_CRYPTO_CAP
 #define CAPREG_SIZE 8
+#define CAPREG_WIDTH 4
 //#endif
 
 
@@ -194,20 +195,21 @@ typedef struct ARMPACKey {
 #endif
 
 
-// //#ifdef TARGET_CRYPTO_CAP
-// typedef struct __attribute__((packed)) capreg {
-//      uint64_t base: 48;
-//      uint32_t offset: 32;
-//      uint32_t size: 32;
-//      uint16_t perms: 16;
-//      uint64_t PT: 64;
-//      uint64_t MAC: 64;
-//      } capreg;
-// //#endif
+//#ifdef TARGET_CRYPTO_CAP
+//typedef struct __attribute__((packed)) ccapreg {
+ typedef struct ccapreg {
+     uint64_t perms_base;
+     uint32_t offset;
+     uint32_t size;
+     uint64_t PT;
+     uint64_t MAC;
+     } ccapreg;
 
 typedef struct capreg {
      uint64_t fields[4];
      } capreg;
+//#endif
+
 
 /* See the commentary above the TBFLAG field definitions.  */
 typedef struct CPUARMTBFlags {
@@ -232,7 +234,9 @@ typedef struct CPUArchState {
     uint64_t pc;
 
 //#ifdef TARGET_CRYPTO_CAP
-    capreg cregs[8];
+    capreg cregs[CAPREG_SIZE];
+    ccapreg ccregs[CAPREG_SIZE];
+
 //#endif
 
     /* PSTATE isn't an architectural register for ARMv8. However, it is

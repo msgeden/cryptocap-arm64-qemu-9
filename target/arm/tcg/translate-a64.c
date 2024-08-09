@@ -27,6 +27,10 @@
 #include "semihosting/semihost.h"
 #include "cpregs.h"
 
+
+#include "tcg/tcg-internal.h"
+
+
 static TCGv_i64 cpu_X[32];
 static TCGv_i64 cpu_pc;
 
@@ -44,7 +48,21 @@ static const char *regnames[] = {
 typedef struct TCGv_i64_x4 {
     TCGv_i64 parts[4];
 } TCGv_i64_x4;
+typedef struct TCGv_c256 {
+    TCGv_i64 perms_base;
+    TCGv_i32 offset;
+    TCGv_i32 size;
+    TCGv_i64 PT;
+    TCGv_i64 MAC;
+} TCGv_c256;
 static TCGv_i64_x4 cpu_C[CAPREG_SIZE];
+static TCGv_c256 cpu_CC[CAPREG_SIZE];
+
+static inline TCGv_i32 TCGV_LOWER(TCGv_i64 t)
+{
+    return temp_tcgv_i32(tcgv_i64_temp(t) + HOST_BIG_ENDIAN);
+}
+
 static const char *capregnames[] = {
     "cr0", "cr1", "cr2", "cr3", "cr4", "cr5", "cr6", "cr7"
 };
@@ -115,13 +133,37 @@ void a64_translate_init(void)
     }
     //#ifdef TARGET_CRYPTO_CAP
     for (i = 0; i < CAPREG_SIZE; i++) {
-        for (int j = 0; j < 4; j++) {
+        for (int j = 0; j < CAPREG_WIDTH; j++) {
             char name[12];
             snprintf(name, sizeof(name), "c%d_%d", i, j);
             cpu_C[i].parts[j] = tcg_global_mem_new_i64(tcg_env,
                                           offsetof(CPUARMState, cregs[i].fields[j]),
                                           name);
         }
+    }
+    
+    for (i = 0; i < CAPREG_SIZE; i++) {
+        char name[15];
+        snprintf(name, sizeof(name), "c%d.perms_base", i);
+        cpu_CC[i].perms_base = tcg_global_mem_new_i64(tcg_env,
+                                          offsetof(CPUARMState, ccregs[i].perms_base),
+                                          name);
+        snprintf(name, sizeof(name), "c%d.offset", i);
+        cpu_CC[i].offset = tcg_global_mem_new_i32(tcg_env,
+                                          offsetof(CPUARMState, ccregs[i].offset),
+                                          name);
+        snprintf(name, sizeof(name), "c%d.size", i);
+        cpu_CC[i].size = tcg_global_mem_new_i32(tcg_env,
+                                          offsetof(CPUARMState, ccregs[i].size),
+                                          name);
+        snprintf(name, sizeof(name), "c%d.PT", i);
+        cpu_CC[i].PT = tcg_global_mem_new_i64(tcg_env,
+                                          offsetof(CPUARMState, ccregs[i].PT),
+                                          name);
+        snprintf(name, sizeof(name), "c%d.MAC", i);
+        cpu_CC[i].MAC = tcg_global_mem_new_i64(tcg_env,
+                                          offsetof(CPUARMState, ccregs[i].MAC),
+                                          name);
     }
     //#end
 
@@ -1405,17 +1447,41 @@ static inline AArch64DecodeFn *lookup_disas_fn(const AArch64DecodeTable *table,
 static bool trans_CMANIP(DisasContext *s, arg_CMANIP *a)
 {
     int idx=a->imm;
-    if (idx >= 4)  
-        return false;
+    //if (idx > 4)  
+    //    return false;
+    //TCGv_i64_x4 CRd = cpu_C[a->crd];
+    //tcg_gen_mov_i64(cpu_C[a->crd].parts[idx], Rs);
     TCGv_i64 Rs = cpu_X[a->rs];
-    TCGv_i64_x4 CRd = cpu_C[a->crd];
-    tcg_gen_mov_i64(cpu_C[a->crd].parts[idx], Rs);
+    switch (idx){
+        case 0:
+            tcg_gen_mov_i64(cpu_CC[a->crd].perms_base, cpu_X[a->rs]);
+            break;
+        case 1:
+            tcg_gen_mov_i32(cpu_CC[a->crd].offset, TCGV_LOWER(Rs));
+            break;
+        case 2:
+            tcg_gen_mov_i32(cpu_CC[a->crd].size, TCGV_LOWER(Rs));
+            break;  
+        case 3:
+            tcg_gen_mov_i64(cpu_CC[a->crd].PT, cpu_X[a->rs]);
+            break;
+         case 4:
+            tcg_gen_mov_i64(cpu_CC[a->crd].MAC, cpu_X[a->rs]);
+            break;
+        default:
+            return false;
+    }
     return true;
 }
 static bool trans_CMOV(DisasContext *s, arg_CMOV *a)
 {
-    for (int i=0; i<4; i++)
-        tcg_gen_mov_i64(cpu_C[a->crd].parts[i], cpu_C[a->crs].parts[i]);
+    // for (int i=0; i<4; i++)
+    //     tcg_gen_mov_i64(cpu_C[a->crd].parts[i], cpu_C[a->crs].parts[i]);
+    tcg_gen_mov_i64(cpu_CC[a->crd].perms_base, cpu_CC[a->crs].perms_base);
+    tcg_gen_mov_i32(cpu_CC[a->crd].offset, cpu_CC[a->crs].offset);
+    tcg_gen_mov_i32(cpu_CC[a->crd].size, cpu_CC[a->crs].size);
+    tcg_gen_mov_i64(cpu_CC[a->crd].PT, cpu_CC[a->crs].PT);
+    tcg_gen_mov_i64(cpu_CC[a->crd].MAC, cpu_CC[a->crs].MAC);
     return true;
 }
 static bool trans_CSETBASE(DisasContext *s, arg_CSETBASE *a)
