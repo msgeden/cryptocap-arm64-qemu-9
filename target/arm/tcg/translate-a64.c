@@ -45,9 +45,9 @@ static const char *regnames[] = {
 };
 
 //#ifdef TARGET_CRYPTO_CAP
-typedef struct TCGv_i64_x4 {
-    TCGv_i64 parts[4];
-} TCGv_i64_x4;
+// typedef struct TCGv_i64_x4 {
+//     TCGv_i64 parts[4];
+// } TCGv_i64_x4;
 typedef struct TCGv_c256 {
     TCGv_i64 perms_base;
     TCGv_i32 offset;
@@ -55,17 +55,14 @@ typedef struct TCGv_c256 {
     TCGv_i64 PT;
     TCGv_i64 MAC;
 } TCGv_c256;
-static TCGv_i64_x4 cpu_C[CAPREG_SIZE];
+
+//static TCGv_i64_x4 cpu_C[CAPREG_SIZE];
 static TCGv_c256 cpu_CC[CAPREG_SIZE];
 
 static inline TCGv_i32 TCGV_LOWER(TCGv_i64 t)
 {
     return temp_tcgv_i32(tcgv_i64_temp(t) + HOST_BIG_ENDIAN);
 }
-
-static const char *capregnames[] = {
-    "cr0", "cr1", "cr2", "cr3", "cr4", "cr5", "cr6", "cr7"
-};
 //#endif
 
 enum a64_shift_type {
@@ -132,15 +129,15 @@ void a64_translate_init(void)
                                           regnames[i]);
     }
     //#ifdef TARGET_CRYPTO_CAP
-    for (i = 0; i < CAPREG_SIZE; i++) {
-        for (int j = 0; j < CAPREG_WIDTH; j++) {
-            char name[12];
-            snprintf(name, sizeof(name), "c%d_%d", i, j);
-            cpu_C[i].parts[j] = tcg_global_mem_new_i64(tcg_env,
-                                          offsetof(CPUARMState, cregs[i].fields[j]),
-                                          name);
-        }
-    }
+    // for (i = 0; i < CAPREG_SIZE; i++) {
+    //     for (int j = 0; j < CAPREG_WIDTH; j++) {
+    //         char name[12];
+    //         snprintf(name, sizeof(name), "c%d_%d", i, j);
+    //         cpu_C[i].parts[j] = tcg_global_mem_new_i64(tcg_env,
+    //                                       offsetof(CPUARMState, cregs[i].fields[j]),
+    //                                       name);
+    //     }
+    // }
     
     for (i = 0; i < CAPREG_SIZE; i++) {
         char name[15];
@@ -611,16 +608,6 @@ TCGv_i64 cpu_reg(DisasContext *s, int reg)
     } else {
         return cpu_X[reg];
     }
-}
-
-TCGv_i64_x4 cpu_creg(DisasContext *s, int reg)
-{
-    return cpu_C[reg];
-}
-
-TCGv_i64 cpu_creg_part(DisasContext *s, int reg, int part)
-{
-    return cpu_C[reg].parts[part];
 }
 
 /* register access for when 31 == SP */
@@ -1454,7 +1441,7 @@ static bool trans_CMANIP(DisasContext *s, arg_CMANIP *a)
     TCGv_i64 Rs = cpu_X[a->rs];
     switch (idx){
         case 0:
-            tcg_gen_mov_i64(cpu_CC[a->crd].perms_base, cpu_X[a->rs]);
+            tcg_gen_mov_i64(cpu_CC[a->crd].perms_base, Rs);
             break;
         case 1:
             tcg_gen_mov_i32(cpu_CC[a->crd].offset, TCGV_LOWER(Rs));
@@ -1463,10 +1450,10 @@ static bool trans_CMANIP(DisasContext *s, arg_CMANIP *a)
             tcg_gen_mov_i32(cpu_CC[a->crd].size, TCGV_LOWER(Rs));
             break;  
         case 3:
-            tcg_gen_mov_i64(cpu_CC[a->crd].PT, cpu_X[a->rs]);
+            tcg_gen_mov_i64(cpu_CC[a->crd].PT, Rs);
             break;
          case 4:
-            tcg_gen_mov_i64(cpu_CC[a->crd].MAC, cpu_X[a->rs]);
+            tcg_gen_mov_i64(cpu_CC[a->crd].MAC, Rs);
             break;
         default:
             return false;
@@ -1486,31 +1473,87 @@ static bool trans_CMOV(DisasContext *s, arg_CMOV *a)
 }
 static bool trans_CSETBASE(DisasContext *s, arg_CSETBASE *a)
 {
-    //TCGv_vec CRs = tcg_temp_new_vec(TCG_TYPE_V256);
-    //TCGv_vec CRd = tcg_temp_new_vec(TCG_TYPE_V256);
-    TCGv_i64 Rs = cpu_X[a->rs];
-    TCGv_i64_x4 CRd = cpu_C[a->crs];
-    //TCGv_i64 CRs;
-    //tcg_gen_mov_i64(CRs,  cpu_X[a->CRs]);
-    //tcg_gen_mov_i64(cpu_X[a->crd], Rs  );
-    tcg_gen_mov_i64(cpu_C[a->crd].parts[0], Rs  );
+    
+    TCGv_i64 Rs_base = cpu_X[a->rs];
+    TCGv_i64 CRs_perms_base = cpu_CC[a->crs].perms_base;
+    TCGv_i64 CRd_perms_base = cpu_CC[a->crd].perms_base;
+    TCGv_i64 tmp=tcg_temp_new_i64();
 
-    //TCGv_ptr creg_ptr = tcg_temp_new_ptr();
-    //tcg_gen_addi_ptr(creg_ptr, cpu_env, offsetof(CPUARMState, cregs[creg_num]));
+    //extract upper 16-bits from CRs.perms_base
+    tcg_gen_shri_i64(tmp, CRs_perms_base, 48);
+    tcg_gen_shli_i64(tmp, tmp, 48);
 
-    // Store the 64-bit GPR value in the first 64 bits of the capreg
-    //tcg_gen_st_i64(gpr_value, creg_ptr, offsetof(capreg, cap[0]));
+    //extract lower 48-bit from Rs
+    tcg_gen_andi_i64(CRd_perms_base, Rs_base, 0x0000FFFFFFFFFFFF);
 
-    // for (int i = 0; i < 4; i++) {
-    //     CRd.parts[i] = CRs.parts[i];
-    // }
-    // CRd.parts[0]=Rs;
+    // combine the results
+    tcg_gen_or_i64(CRd_perms_base, CRd_perms_base, tmp);
 
-    //...
- 
-    //...
+    // take other fields from CRs 
+    tcg_gen_mov_i32(cpu_CC[a->crd].offset, cpu_CC[a->crs].offset);
+    tcg_gen_mov_i32(cpu_CC[a->crd].size, cpu_CC[a->crs].size);
+    tcg_gen_mov_i64(cpu_CC[a->crd].PT, cpu_CC[a->crs].PT);
+    tcg_gen_mov_i64(cpu_CC[a->crd].MAC, cpu_CC[a->crs].MAC);
+
     return true;
 }
+static bool trans_CSETSIZE(DisasContext *s, arg_CSETSIZE *a)
+{   
+    TCGv_i64 Rs_size = cpu_X[a->rs];
+
+    //replace size field
+    tcg_gen_mov_i32(cpu_CC[a->crd].size, TCGV_LOWER(Rs_size));
+
+    // take other fields from CRs 
+    tcg_gen_mov_i64(cpu_CC[a->crd].perms_base, cpu_CC[a->crs].perms_base);
+    tcg_gen_mov_i32(cpu_CC[a->crd].offset, cpu_CC[a->crs].offset);
+    tcg_gen_mov_i64(cpu_CC[a->crd].PT, cpu_CC[a->crs].PT);
+    tcg_gen_mov_i64(cpu_CC[a->crd].MAC, cpu_CC[a->crs].MAC);
+
+    return true;
+}
+static bool trans_CSETPERMS(DisasContext *s, arg_CSETPERMS *a)
+{
+    
+    TCGv_i64 Rs_perms = cpu_X[a->rs];
+    TCGv_i64 CRs_perms_base = cpu_CC[a->crs].perms_base;
+    TCGv_i64 CRd_perms_base = cpu_CC[a->crd].perms_base;
+    TCGv_i64 tmp=tcg_temp_new_i64();
+
+
+    //extract the upper 16-bit
+    tcg_gen_shli_i64(tmp, Rs_perms, 48);
+    tcg_gen_andi_i64(tmp, tmp, 0xFFFF000000000000);
+
+    // combine the results
+    tcg_gen_or_i64(CRd_perms_base, CRs_perms_base, tmp);
+
+    // take other fields from CRs 
+    tcg_gen_mov_i32(cpu_CC[a->crd].offset, cpu_CC[a->crs].offset);
+    tcg_gen_mov_i32(cpu_CC[a->crd].size, cpu_CC[a->crs].size);
+    tcg_gen_mov_i64(cpu_CC[a->crd].PT, cpu_CC[a->crs].PT);
+    tcg_gen_mov_i64(cpu_CC[a->crd].MAC, cpu_CC[a->crs].MAC);
+    
+    return true;
+}
+
+static bool trans_CSETADDR(DisasContext *s, arg_CSETADDR *a)
+{
+    TCGv_i64 Rs_offset = cpu_X[a->rs];
+
+    //replace size field
+    tcg_gen_mov_i32(cpu_CC[a->crd].offset, TCGV_LOWER(Rs_offset));
+
+    // take other fields from CRs 
+    tcg_gen_mov_i64(cpu_CC[a->crd].perms_base, cpu_CC[a->crs].perms_base);
+    tcg_gen_mov_i32(cpu_CC[a->crd].size, cpu_CC[a->crs].size);
+    tcg_gen_mov_i64(cpu_CC[a->crd].PT, cpu_CC[a->crs].PT);
+    tcg_gen_mov_i64(cpu_CC[a->crd].MAC, cpu_CC[a->crs].MAC);
+
+    return true;
+}
+
+
 //#endif 
 
 /*

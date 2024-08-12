@@ -1095,14 +1095,14 @@ static void aarch64_cpu_dump_state(CPUState *cs, FILE *f, int flags)
     }
     
 //#ifdef TARGET_CRYPTO_CAP
+    // for (i = 0; i < CAPREG_SIZE; i++) {    
+    //     qemu_fprintf(f, "CR%01d=%016" PRIx64 ":%016" PRIx64 ":%016" PRIx64 ":%016" PRIx64 "%s" , i, 
+    //     env->cregs[i].fields[0], env->cregs[i].fields[1], env->cregs[i].fields[2], env->cregs[i].fields[3],
+    //     "\n");
+    // }
     for (i = 0; i < CAPREG_SIZE; i++) {    
-        qemu_fprintf(f, "CR%01d=%016" PRIx64 ":%016" PRIx64 ":%016" PRIx64 ":%016" PRIx64 "%s" , i, 
-        env->cregs[i].fields[0], env->cregs[i].fields[1], env->cregs[i].fields[2], env->cregs[i].fields[3],
-        "\n");
-    }
-    for (i = 0; i < CAPREG_SIZE; i++) {    
-        qemu_fprintf(f, "CR%01d.perms_base=%016" PRIx64 ":.offset=%016" PRIx32 ":.size=%016" PRIx32  ":.PT=%016" PRIx64 ":.MAC=%016" PRIx64 "%s" , i, 
-        env->ccregs[i].perms_base, env->ccregs[i].offset, env->ccregs[i].size, env->ccregs[i].PT, env->ccregs[i].MAC,
+        qemu_fprintf(f, "CR%01d.perms=%04" PRIx16 ":.base=%012" PRIx64 ":.offset=%08" PRIx32 ":.size=%08" PRIx32  ":.PT=%016" PRIx64 ":.MAC=%016" PRIx64 "%s" , i, 
+        ((uint16_t)(env->ccregs[i].perms_base >> 48) & 0xFFFF), (env->ccregs[i].perms_base & 0xFFFFFFFFFFFF), env->ccregs[i].offset, env->ccregs[i].size, env->ccregs[i].PT, env->ccregs[i].MAC,
         "\n");
     }
 //#endif

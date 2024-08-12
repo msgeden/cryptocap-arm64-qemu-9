@@ -205,9 +205,9 @@ typedef struct ARMPACKey {
      uint64_t MAC;
      } ccapreg;
 
-typedef struct capreg {
-     uint64_t fields[4];
-     } capreg;
+// typedef struct capreg {
+//      uint64_t fields[4];
+//      } capreg;
 //#endif
 
 
@@ -234,7 +234,7 @@ typedef struct CPUArchState {
     uint64_t pc;
 
 //#ifdef TARGET_CRYPTO_CAP
-    capreg cregs[CAPREG_SIZE];
+    //capreg cregs[CAPREG_SIZE];
     ccapreg ccregs[CAPREG_SIZE];
 
 //#endif

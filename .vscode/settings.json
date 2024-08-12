@@ -15,5 +15,5 @@
         "string_view": "c",
         "initializer_list": "c"
     },
-    "qemu.test_file":"test_csetbase"
+    "qemu.test_file":"test_cset"
 }

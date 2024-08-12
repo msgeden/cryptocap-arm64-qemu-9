@@ -89,7 +89,9 @@
             "command": "${workspaceFolder}/build/qemu-aarch64",
             "args": [
              "-one-insn-per-tb", 
-             "-d", "in_asm,op,out_asm,cpu,fpu,mmu,int,exec", 
+             //"-d", "in_asm,op,out_asm,cpu,fpu,mmu,int,exec", 
+             "-d", "in_asm,op,out_asm,cpu,mmu,int,exec", 
+
              "-D", "${workspaceFolder}/../logs/qemu-user-aarch64-${config:qemu.test_file}.log",
              "${workspaceFolder}/../tests/${config:qemu.test_file}",
             ],

@@ -36,4 +36,7 @@
 CMANIP      000 0001 01111 00000 00 ... ..... .....  @op_imm_crd_rs
 CMOV        000 0001 10000 00000 00000 ..... .....  @op_crd_crs
 CSETBASE    000 0001 00101 00000 ..... ..... .....  @op_crd_crs_rs
+CSETSIZE    000 0001 00110 00000 ..... ..... .....  @op_crd_crs_rs
+CSETPERMS    000 0001 00111 00000 ..... ..... .....  @op_crd_crs_rs
+CSETADDR    000 0001 01000 00000 ..... ..... .....  @op_crd_crs_rs
 

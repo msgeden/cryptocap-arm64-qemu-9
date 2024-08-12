@@ -91,7 +91,9 @@
             //"args": ["--version"],
             //"args": ["-machine virt -cpu cortex-a57 -nographic -kernel ${workspaceFolder}/../tests/${config:qemu.test_file}.elf -S -gdb tcp::1234"],
             "args": [
-                "-one-insn-per-tb", "-d", "in_asm,op,out_asm,cpu,fpu,mmu,int,exec", //--"-one-insn-per-tb" is used as "-singlestep" in old versions
+                "-one-insn-per-tb", 
+                //"-d", "in_asm,op,out_asm,cpu,fpu,mmu,int,exec", //--"-one-insn-per-tb" is used as "-singlestep" in old versions
+                "-d", "in_asm,op,out_asm,cpu,mmu,int,exec", //--"-one-insn-per-tb" is used as "-singlestep" in old versions
                 "-D", "${workspaceFolder}/../logs/qemu-user-aarch64-${config:qemu.test_file}.log",
                 "${workspaceFolder}/../tests/${config:qemu.test_file}"
                 //"-S -s" //for gdb to connect
