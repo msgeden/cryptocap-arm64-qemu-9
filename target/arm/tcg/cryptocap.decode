@@ -24,14 +24,17 @@
 &imm_crd_rs imm crd rs  
 &crd_crs crd crs
 &crd_crs_rs crd crs rs      
+&imm_idx_cr_r imm idx cr r  
+
 
 #OPERATION TYPES
 @op_imm_crd_rs           ... .... ..... ..... .. imm:3 crd:5 rs:5 &imm_crd_rs
 @op_crd_crs              ... .... ..... ..... ..... crd:5 crs:5 &crd_crs
 @op_crd_crs_rs           ... .... ..... ..... crd:5 crs:5 rs:5 &crd_crs_rs
+@op_imm_idx_cr_r       ... .... ..... imm:8 idx:2 cr:5 r:5 &imm_idx_cr_r
 
 
-#INSTRUCTIONS
+#CAPABILITY MANIPULATION INSTRUCTIONS
 #a generic capability register manipulation instruction based on index (imm)
 CMANIP      000 0001 01111 00000 00 ... ..... .....  @op_imm_crd_rs
 CMOV        000 0001 10000 00000 00000 ..... .....  @op_crd_crs
@@ -40,3 +43,12 @@ CSETSIZE    000 0001 00110 00000 ..... ..... .....  @op_crd_crs_rs
 CSETPERMS    000 0001 00111 00000 ..... ..... .....  @op_crd_crs_rs
 CSETADDR    000 0001 01000 00000 ..... ..... .....  @op_crd_crs_rs
 
+#MEMORY INSTRUCTIONS
+#intra-domain capability load/store
+LDC    000 0001 00000 ........ .. ..... .....  @op_imm_idx_cr_r
+STC    000 0001 00001 ........ .. ..... .....  @op_imm_idx_cr_r
+#cross-domaion data load/store
+#CLDG    000 0001 00010 ........ .. ..... .....  @op_imm_idx_cr_r
+#CSTG    000 0001 00011 ........ .. ..... .....  @op_imm_idx_cr_r
+#cross-domaion capability load
+#CLDC    000 0001 00100 ........ .. ..... .....  @op_imm_idx_cr_r
