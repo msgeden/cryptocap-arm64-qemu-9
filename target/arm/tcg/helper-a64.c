@@ -1855,3 +1855,120 @@ void HELPER(cpyfe)(CPUARMState *env, uint32_t syndrome, uint32_t wdesc,
 {
     do_cpye(env, syndrome, wdesc, rdesc, false, GETPC());
 }
+
+// //ifdef TARGET_CRYPTO_CAP
+static void do_cldg(CPUARMState *env, uint64_t perms_base, uint32_t offset, uint32_t size, uint64_t PT, uint64_t MAC)
+{
+    return;
+    // do_cldg(env, syndrome, wdesc, rdesc, false, GETPC());
+} 
+//                     uint32_t rdesc, uint32_t move, uintptr_t ra)
+// {
+// //     /* Epilogue: do the last partial page */
+// //     int rd = mops_destreg(syndrome);
+// //     int rs = mops_srcreg(syndrome);
+// //     int rn = mops_sizereg(syndrome);
+// //     uint32_t rmemidx = FIELD_EX32(rdesc, MTEDESC, MIDX);
+// //     uint32_t wmemidx = FIELD_EX32(wdesc, MTEDESC, MIDX);
+// //     bool forwards = true;
+// //     uint64_t toaddr, fromaddr, copysize, step;
+
+// //     check_mops_enabled(env, ra);
+
+// //     /* We choose to NOP out "no data to copy" before consistency checks */
+// //     if (env->xregs[rn] == 0) {
+// //         return;
+// //     }
+
+// //     check_mops_wrong_option(env, syndrome, ra);
+
+// //     if (move) {
+// //         forwards = (int64_t)env->xregs[rn] < 0;
+// //     }
+
+// //     if (forwards) {
+// //         toaddr = env->xregs[rd] + env->xregs[rn];
+// //         fromaddr = env->xregs[rs] + env->xregs[rn];
+// //         copysize = -env->xregs[rn];
+// //     } else {
+// //         copysize = env->xregs[rn];
+// //         /* This toaddr and fromaddr point to the *last* byte to copy */
+// //         toaddr = env->xregs[rd] + copysize - 1;
+// //         fromaddr = env->xregs[rs] + copysize - 1;
+// //     }
+
+// //     if (!mte_checks_needed(fromaddr, rdesc)) {
+// //         rdesc = 0;
+// //     }
+// //     if (!mte_checks_needed(toaddr, wdesc)) {
+// //         wdesc = 0;
+// //     }
+
+// //     /* Check the size; we don't want to have do a check-for-interrupts */
+// //     if (copysize >= TARGET_PAGE_SIZE) {
+// //         raise_exception_ra(env, EXCP_UDEF, syndrome,
+// //                            mops_mismatch_exception_target_el(env), ra);
+// //     }
+
+// //     /* Do the actual memmove */
+// //     if (forwards) {
+// //         while (copysize > 0) {
+// //             step = copy_step(env, toaddr, fromaddr, copysize,
+// //                              wmemidx, rmemidx, &wdesc, &rdesc, ra);
+// //             toaddr += step;
+// //             fromaddr += step;
+// //             copysize -= step;
+// //             env->xregs[rn] = -copysize;
+// //         }
+// //     } else {
+// //         while (copysize > 0) {
+// //             step = copy_step_rev(env, toaddr, fromaddr, copysize,
+// //                                  wmemidx, rmemidx, &wdesc, &rdesc, ra);
+// //             toaddr -= step;
+// //             fromaddr -= step;
+// //             copysize -= step;
+// //             env->xregs[rn] = copysize;
+// //         }
+// //     }
+//     return;
+// }
+void HELPER(cldg)(CPUARMState *env, uint64_t perms,  uint64_t base, uint32_t offset, uint32_t size, uint64_t PT, uint64_t MAC)
+{
+    // if (offset > size){
+    //     raise_exception(env, EXCP_UDEF);
+    //     return;
+    // }
+        
+    // uint64_t address = base + offset;
+
+    
+    // // Check bounds
+    // if (offset + size > 64) {
+    //     // Raise an exception or handle the error
+    //     raise_exception(env, EXCP_UDEF);
+    //     return;
+    // }
+    
+    // // Check permissions
+    // if (!check_permissions(env, address, size, PT)) {
+    //     // Raise an exception or handle the error
+    //     raise_exception(env, EXCP_UDEF);
+    //     return;
+    // }
+    
+    // // Perform the load operation
+    // uint64_t data = load_from_memory(env, address, size);
+    
+    // // Verify MAC (Message Authentication Code)
+    // if (!verify_mac(data, MAC)) {
+    //     // Raise an exception or handle the error
+    //     raise_exception(env, EXCP_UDEF);
+    //     return;
+    // }
+    
+
+     //do_cldg(env, syndrome, wdesc, rdesc, false, GETPC());
+}
+
+
+//endif

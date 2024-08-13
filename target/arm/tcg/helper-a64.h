@@ -131,3 +131,7 @@ DEF_HELPER_4(cpye, void, env, i32, i32, i32)
 DEF_HELPER_4(cpyfp, void, env, i32, i32, i32)
 DEF_HELPER_4(cpyfm, void, env, i32, i32, i32)
 DEF_HELPER_4(cpyfe, void, env, i32, i32, i32)
+
+// //ifdef TARGET_CRYPTO_CAP
+DEF_HELPER_7(cldg, void, env, i64, i64, i32, i32, i64, i64)
+// //endif

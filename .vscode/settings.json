@@ -14,7 +14,8 @@
         "array": "c",
         "string_view": "c",
         "initializer_list": "c",
-        "host-utils.h": "c"
+        "host-utils.h": "c",
+        "streambuf": "cpp"
     },
-    "qemu.test_file":"test_cmem"
+    "qemu.test_file":"test_cmem_cstg-cldg"
 }

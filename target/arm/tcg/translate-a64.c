@@ -1556,166 +1556,146 @@ static bool trans_CSETADDR(DisasContext *s, arg_CSETADDR *a)
 
 static bool trans_LDC(DisasContext *s, arg_LDC *a)
 {
-    TCGv_i64 addr = cpu_reg(s, a->r);
-    //TCGv_i64 perms_base = cpu_CC[a->cr].perms_base;
-    //
-    
+    TCGv_i64 addr = tcg_temp_new_i64();
+    tcg_gen_mov_i64(addr, cpu_reg(s, a->r));
+  
     TCGv_i64 tmp1 = tcg_temp_new_i64();
-    // TCGv_i64 tmp2 = tcg_temp_new_i64();
-    // TCGv_i64 tmp3 = tcg_temp_new_i64();
-    // TCGv_i64 tmp4 = tcg_temp_new_i64();
+    TCGv_i32 tmp2 = tcg_temp_new_i32();
+    TCGv_i32 tmp3 = tcg_temp_new_i32();
+    TCGv_i64 tmp4 = tcg_temp_new_i64();
+    TCGv_i64 tmp5 = tcg_temp_new_i64();
 
+    //perms_base
     tcg_gen_qemu_ld_i64(tmp1, addr, get_mem_index(s), MO_64);
     tcg_gen_st_i64(tmp1, tcg_env, offsetof(CPUARMState, ccregs[a->cr].perms_base));
-    //tcg_gen_addi_i64(addr, addr, 8);
+    tcg_gen_addi_i64(addr, addr, 8);
     
-
-
-    // for (i = 0; i < 4; i++) {
-    //     tmp = tcg_temp_new_i64();
-    //     tcg_gen_ld_i64(tmp, cpu_env, offsetof(CPUARMState, cap_regs[a->crt]) + i * 8);
-    //     tcg_gen_qemu_st_i64(tmp, addr, get_mem_index(s), MO_64);
-    //     tcg_gen_addi_i64(addr, addr, 8);
-    //     tcg_temp_free_i64(tmp);
-    // }
-
+    //offset
+    tcg_gen_qemu_ld_i32(tmp2, addr, get_mem_index(s), MO_32);
+    tcg_gen_st_i32(tmp2, tcg_env, offsetof(CPUARMState, ccregs[a->cr].offset));
+    tcg_gen_addi_i64(addr, addr, 4);
+    
+    //size
+    tcg_gen_qemu_ld_i32(tmp3, addr, get_mem_index(s), MO_32);
+    tcg_gen_st_i32(tmp3, tcg_env, offsetof(CPUARMState, ccregs[a->cr].size));
+    tcg_gen_addi_i64(addr, addr, 4);
+    
+    //PT
+    tcg_gen_qemu_ld_i64(tmp4, addr, get_mem_index(s), MO_64);
+    tcg_gen_st_i64(tmp4, tcg_env, offsetof(CPUARMState, ccregs[a->cr].PT));
+    tcg_gen_addi_i64(addr, addr, 8);
+    
+    //MAC
+    tcg_gen_qemu_ld_i64(tmp5, addr, get_mem_index(s), MO_64);
+    tcg_gen_st_i64(tmp5, tcg_env, offsetof(CPUARMState, ccregs[a->cr].MAC));
+    
     return true;
 }
 
 static bool trans_STC(DisasContext *s, arg_STC *a)
 {
-    TCGv_i64 addr = cpu_reg(s, a->r);
-    //TCGv_i64 perms_base = cpu_CC[a->cr].perms_base;
-    // 
+    TCGv_i64 addr = tcg_temp_new_i64();
+    tcg_gen_mov_i64(addr, cpu_reg(s, a->r));
+ 
     TCGv_i64 tmp1 = tcg_temp_new_i64();
-    // TCGv_i64 tmp2 = tcg_temp_new_i64();
-    // TCGv_i64 tmp3 = tcg_temp_new_i64();
-    // TCGv_i64 tmp4 = tcg_temp_new_i64();
+    TCGv_i32 tmp2 = tcg_temp_new_i32();
+    TCGv_i32 tmp3 = tcg_temp_new_i32();
+    TCGv_i64 tmp4 = tcg_temp_new_i64();
+    TCGv_i64 tmp5 = tcg_temp_new_i64();
 
+    //perms_base
     tcg_gen_ld_i64(tmp1, tcg_env, offsetof(CPUARMState, ccregs[a->cr].perms_base));
     tcg_gen_qemu_st_i64(tmp1, addr, get_mem_index(s), MO_64);
-    //tcg_gen_addi_i64(addr, addr, 8);
-    
-    
-    
+    tcg_gen_addi_i64(addr, addr, 8);
 
-
+    //offset
+    tcg_gen_ld_i32(tmp2, tcg_env, offsetof(CPUARMState, ccregs[a->cr].offset));
+    tcg_gen_qemu_st_i32(tmp2, addr, get_mem_index(s), MO_32);
+    tcg_gen_addi_i64(addr, addr, 4);
+    
+    //size
+    tcg_gen_ld_i32(tmp3, tcg_env, offsetof(CPUARMState, ccregs[a->cr].size));
+    tcg_gen_qemu_st_i32(tmp3, addr, get_mem_index(s), MO_32);
+    tcg_gen_addi_i64(addr, addr, 4);
+    
+    //PT
+    tcg_gen_ld_i64(tmp4, tcg_env, offsetof(CPUARMState, ccregs[a->cr].PT));
+    tcg_gen_qemu_st_i64(tmp4, addr, get_mem_index(s), MO_64);
+    tcg_gen_addi_i64(addr, addr, 8);
+  
+    //MAC
+    tcg_gen_ld_i64(tmp5, tcg_env, offsetof(CPUARMState, ccregs[a->cr].MAC));
+    tcg_gen_qemu_st_i64(tmp5, addr, get_mem_index(s), MO_64);
+    
     return true;
 }
-// static bool trans_STP(DisasContext *s, arg_ldstpair *a)
-// {
-//     uint64_t offset = a->imm << a->sz;
-//     TCGv_i64 clean_addr, dirty_addr, tcg_rt, tcg_rt2;
-//     MemOp mop = finalize_memop(s, a->sz);
 
-//     op_addr_ldstpair_pre(s, a, &clean_addr, &dirty_addr, offset, true, mop);
-//     tcg_rt = cpu_reg(s, a->rt);
-//     tcg_rt2 = cpu_reg(s, a->rt2);
-//     /*
-//      * We built mop above for the single logical access -- rebuild it
-//      * now for the paired operation.
-//      *
-//      * With LSE2, non-sign-extending pairs are treated atomically if
-//      * aligned, and if unaligned one of the pair will be completely
-//      * within a 16-byte block and that element will be atomic.
-//      * Otherwise each element is separately atomic.
-//      * In all cases, issue one operation with the correct atomicity.
-//      */
-//     mop = a->sz + 1;
-//     if (s->align_mem) {
-//         mop |= (a->sz == 2 ? MO_ALIGN_4 : MO_ALIGN_8);
-//     }
-//     mop = finalize_memop_pair(s, mop);
-//     if (a->sz == 2) {
-//         TCGv_i64 tmp = tcg_temp_new_i64();
+static bool trans_CLDG(DisasContext *s, arg_CLDG *a)
+{
+    TCGv_i64 addr = tcg_temp_new_i64();
+    TCGv_i64 value = tcg_temp_new_i64();
 
-//         if (s->be_data == MO_LE) {
-//             tcg_gen_concat32_i64(tmp, tcg_rt, tcg_rt2);
-//         } else {
-//             tcg_gen_concat32_i64(tmp, tcg_rt2, tcg_rt);
-//         }
-//         tcg_gen_qemu_st_i64(tmp, clean_addr, get_mem_index(s), mop);
-//     } else {
-//         TCGv_i128 tmp = tcg_temp_new_i128();
+    TCGv_i64 perms = tcg_temp_new_i64();
+    TCGv_i64 base = tcg_temp_new_i64();
+    TCGv_i32 offset = tcg_temp_new_i32();
+    TCGv_i32 size = tcg_temp_new_i32();
+    TCGv_i64 PT = tcg_temp_new_i64();
+    TCGv_i64 MAC = tcg_temp_new_i64();
 
-//         if (s->be_data == MO_LE) {
-//             tcg_gen_concat_i64_i128(tmp, tcg_rt, tcg_rt2);
-//         } else {
-//             tcg_gen_concat_i64_i128(tmp, tcg_rt2, tcg_rt);
-//         }
-//         tcg_gen_qemu_st_i128(tmp, clean_addr, get_mem_index(s), mop);
-//     }
-//     op_addr_ldstpair_post(s, a, dirty_addr, offset);
-//     return true;
-// }
+    tcg_gen_andi_i64(perms, cpu_CC[a->cr].perms_base, 0xFFFF000000000000);
+    tcg_gen_andi_i64(base, cpu_CC[a->cr].perms_base, 0x0000FFFFFFFFFFFF);
+    tcg_gen_mov_i32(offset, cpu_CC[a->cr].offset);
+    tcg_gen_mov_i32(size, cpu_CC[a->cr].size);
+    tcg_gen_mov_i64(PT, cpu_CC[a->cr].PT);
+    tcg_gen_mov_i64(MAC, cpu_CC[a->cr].MAC);
+    
+    //calculate address
+    TCGv_i64 offset64 = tcg_temp_new_i64();
+    tcg_gen_ext_i32_i64(offset64, offset);
+    tcg_gen_add_i64(addr, base, offset64);
+    
+    //load to 64-bit x register  
+    tcg_gen_qemu_ld_i64(value, addr, get_mem_index(s), MO_64);
+    tcg_gen_st_i64(value, tcg_env, offsetof(CPUARMState, xregs[a->r]));
 
-// static bool trans_LDP(DisasContext *s, arg_ldstpair *a)
-// {
-//     uint64_t offset = a->imm << a->sz;
-//     TCGv_i64 clean_addr, dirty_addr, tcg_rt, tcg_rt2;
-//     MemOp mop = finalize_memop(s, a->sz);
+    //gen_helper_cldg(tcg_env, perms, base, offset, size, PT, MAC);
+    //ctx->base.pc_next += 4;
+    return true;
+}
+static bool trans_CSTG(DisasContext *s, arg_CSTG *a)
+{
+    TCGv_i64 addr = tcg_temp_new_i64();
+    TCGv_i64 value = tcg_temp_new_i64();
 
-//     op_addr_ldstpair_pre(s, a, &clean_addr, &dirty_addr, offset, false, mop);
-//     tcg_rt = cpu_reg(s, a->rt);
-//     tcg_rt2 = cpu_reg(s, a->rt2);
+    TCGv_i64 perms = tcg_temp_new_i64();
+    TCGv_i64 base = tcg_temp_new_i64();
+    TCGv_i32 offset = tcg_temp_new_i32();
+    TCGv_i32 size = tcg_temp_new_i32();
+    TCGv_i64 PT = tcg_temp_new_i64();
+    TCGv_i64 MAC = tcg_temp_new_i64();
 
-//     /*
-//      * We built mop above for the single logical access -- rebuild it
-//      * now for the paired operation.
-//      *
-//      * With LSE2, non-sign-extending pairs are treated atomically if
-//      * aligned, and if unaligned one of the pair will be completely
-//      * within a 16-byte block and that element will be atomic.
-//      * Otherwise each element is separately atomic.
-//      * In all cases, issue one operation with the correct atomicity.
-//      *
-//      * This treats sign-extending loads like zero-extending loads,
-//      * since that reuses the most code below.
-//      */
-//     mop = a->sz + 1;
-//     if (s->align_mem) {
-//         mop |= (a->sz == 2 ? MO_ALIGN_4 : MO_ALIGN_8);
-//     }
-//     mop = finalize_memop_pair(s, mop);
-//     if (a->sz == 2) {
-//         int o2 = s->be_data == MO_LE ? 32 : 0;
-//         int o1 = o2 ^ 32;
+    tcg_gen_andi_i64(perms, cpu_CC[a->cr].perms_base, 0xFFFF000000000000);
+    tcg_gen_andi_i64(base, cpu_CC[a->cr].perms_base, 0x0000FFFFFFFFFFFF);
+    tcg_gen_mov_i32(offset, cpu_CC[a->cr].offset);
+    tcg_gen_mov_i32(size, cpu_CC[a->cr].size);
+    tcg_gen_mov_i64(PT, cpu_CC[a->cr].PT);
+    tcg_gen_mov_i64(MAC, cpu_CC[a->cr].MAC);
 
-//         tcg_gen_qemu_ld_i64(tcg_rt, clean_addr, get_mem_index(s), mop);
-//         if (a->sign) {
-//             tcg_gen_sextract_i64(tcg_rt2, tcg_rt, o2, 32);
-//             tcg_gen_sextract_i64(tcg_rt, tcg_rt, o1, 32);
-//         } else {
-//             tcg_gen_extract_i64(tcg_rt2, tcg_rt, o2, 32);
-//             tcg_gen_extract_i64(tcg_rt, tcg_rt, o1, 32);
-//         }
-//     } else {
-//         TCGv_i128 tmp = tcg_temp_new_i128();
-
-//         tcg_gen_qemu_ld_i128(tmp, clean_addr, get_mem_index(s), mop);
-//         if (s->be_data == MO_LE) {
-//             tcg_gen_extr_i128_i64(tcg_rt, tcg_rt2, tmp);
-//         } else {
-//             tcg_gen_extr_i128_i64(tcg_rt2, tcg_rt, tmp);
-//         }
-//     }
-//     op_addr_ldstpair_post(s, a, dirty_addr, offset);
-//     return true;
-// }
-
-
-// static bool trans_CLDG(DisasContext *s, arg_CLDG *a)
-// {
-//     return true;
-// }
-// static bool trans_CSTG(DisasContext *s, arg_CSTG *a)
-// {
-//     return true;
-// }
-// static bool trans_CLDC(DisasContext *s, arg_CLDC *a)
-// {
-//     return true;
-// }
+    //calculate address
+    TCGv_i64 offset64 = tcg_temp_new_i64();
+    tcg_gen_ext_i32_i64(offset64, offset);
+    tcg_gen_add_i64(addr, base, offset64);
+    
+    //store from 64-bit x register  
+    tcg_gen_ld_i64(value, tcg_env, offsetof(CPUARMState, xregs[a->r]));
+    tcg_gen_qemu_st_i64(value, addr, get_mem_index(s), MO_64);
+   
+    return true;
+}
+static bool trans_CLDC(DisasContext *s, arg_CLDC *a)
+{
+    return true;
+}
 //#endif 
 
 /*

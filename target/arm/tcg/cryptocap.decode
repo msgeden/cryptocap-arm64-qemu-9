@@ -25,6 +25,7 @@
 &crd_crs crd crs
 &crd_crs_rs crd crs rs      
 &imm_idx_cr_r imm idx cr r  
+&imm_idx_r_cr imm idx r cr  
 
 
 #OPERATION TYPES
@@ -32,6 +33,7 @@
 @op_crd_crs              ... .... ..... ..... ..... crd:5 crs:5 &crd_crs
 @op_crd_crs_rs           ... .... ..... ..... crd:5 crs:5 rs:5 &crd_crs_rs
 @op_imm_idx_cr_r       ... .... ..... imm:8 idx:2 cr:5 r:5 &imm_idx_cr_r
+@op_imm_idx_r_cr       ... .... ..... imm:8 idx:2 r:5 cr:5 &imm_idx_r_cr
 
 
 #CAPABILITY MANIPULATION INSTRUCTIONS
@@ -48,7 +50,7 @@ CSETADDR    000 0001 01000 00000 ..... ..... .....  @op_crd_crs_rs
 LDC    000 0001 00000 ........ .. ..... .....  @op_imm_idx_cr_r
 STC    000 0001 00001 ........ .. ..... .....  @op_imm_idx_cr_r
 #cross-domaion data load/store
-#CLDG    000 0001 00010 ........ .. ..... .....  @op_imm_idx_cr_r
-#CSTG    000 0001 00011 ........ .. ..... .....  @op_imm_idx_cr_r
+CLDG    000 0001 00010 ........ .. ..... .....  @op_imm_idx_r_cr
+CSTG    000 0001 00011 ........ .. ..... .....  @op_imm_idx_r_cr
 #cross-domaion capability load
-#CLDC    000 0001 00100 ........ .. ..... .....  @op_imm_idx_cr_r
+CLDC    000 0001 00100 ........ .. ..... .....  @op_imm_idx_cr_r
