@@ -1885,9 +1885,15 @@ static bool is_MAC_violation(uint64_t perms, uint64_t base, uint32_t offset, uin
 
 void HELPER(cstg)(CPUARMState *env, uint64_t perms,  uint64_t base, uint32_t offset, uint32_t size, uint64_t PT, uint64_t MAC)
 {
+    // ns: non-secure mode, s: secure mode
+    // TTBR0: base register 0 (typically user space)
+    // TTBR1: base register 1 (@should be for kernel space) we're using TTBR0_EL1, adjust if needed
+    //if (PT==TBRR){
+    uint64_t ttbr = env->cp15.ttbr0_ns;  // ns for non-secure mode s for secure mod we're using TTBR0_EL1, adjust if needed
+    //uint64_t ttbr = env->cp15.ttbr0_el[1];  // Assuming we're using TTBR0_EL1, adjust if needed
     //intra-domain access
     //if (PT==TBRR){
-    if (PT!=0){
+    if (PT==ttbr){
         return;   
     }//cross-domain access
     else{    

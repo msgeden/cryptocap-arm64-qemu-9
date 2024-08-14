@@ -17,5 +17,6 @@
         "host-utils.h": "c",
         "streambuf": "cpp"
     },
-    "qemu.test_file":"test_cmem_cstg-cldg"
+    "qemu.test_file":"test_cmem_cstg-cldg",
+    "home":"${env:HOME}",
 }
