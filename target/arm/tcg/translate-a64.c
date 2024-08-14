@@ -1642,8 +1642,10 @@ static bool trans_CLDG(DisasContext *s, arg_CLDG *a)
     TCGv_i64 PT = tcg_temp_new_i64();
     TCGv_i64 MAC = tcg_temp_new_i64();
 
-    tcg_gen_andi_i64(perms, cpu_CC[a->cr].perms_base, 0xFFFF000000000000);
+    //tcg_gen_andi_i64(perms, cpu_CC[a->cr].perms_base, 0xFFFF000000000000);
+    tcg_gen_shri_i64(perms, cpu_CC[a->cr].perms_base, 48);
     tcg_gen_andi_i64(base, cpu_CC[a->cr].perms_base, 0x0000FFFFFFFFFFFF);
+
     tcg_gen_mov_i32(offset, cpu_CC[a->cr].offset);
     tcg_gen_mov_i32(size, cpu_CC[a->cr].size);
     tcg_gen_mov_i64(PT, cpu_CC[a->cr].PT);
@@ -1653,12 +1655,14 @@ static bool trans_CLDG(DisasContext *s, arg_CLDG *a)
     TCGv_i64 offset64 = tcg_temp_new_i64();
     tcg_gen_ext_i32_i64(offset64, offset);
     tcg_gen_add_i64(addr, base, offset64);
-    
+
+    //MAC, bounds, permission checks 
+    gen_helper_cldg(tcg_env, perms, base, offset, size, PT, MAC);
+
     //load to 64-bit x register  
     tcg_gen_qemu_ld_i64(value, addr, get_mem_index(s), MO_64);
     tcg_gen_st_i64(value, tcg_env, offsetof(CPUARMState, xregs[a->r]));
-
-    //gen_helper_cldg(tcg_env, perms, base, offset, size, PT, MAC);
+    
     //ctx->base.pc_next += 4;
     return true;
 }
@@ -1674,18 +1678,26 @@ static bool trans_CSTG(DisasContext *s, arg_CSTG *a)
     TCGv_i64 PT = tcg_temp_new_i64();
     TCGv_i64 MAC = tcg_temp_new_i64();
 
-    tcg_gen_andi_i64(perms, cpu_CC[a->cr].perms_base, 0xFFFF000000000000);
+    TCGv_i64 tmp = tcg_temp_new_i64();
+
+    //tcg_gen_andi_i64(perms, cpu_CC[a->cr].perms_base, 0xFFFF000000000000);
+    tcg_gen_shri_i64(perms, cpu_CC[a->cr].perms_base, 48);
     tcg_gen_andi_i64(base, cpu_CC[a->cr].perms_base, 0x0000FFFFFFFFFFFF);
+
     tcg_gen_mov_i32(offset, cpu_CC[a->cr].offset);
     tcg_gen_mov_i32(size, cpu_CC[a->cr].size);
     tcg_gen_mov_i64(PT, cpu_CC[a->cr].PT);
     tcg_gen_mov_i64(MAC, cpu_CC[a->cr].MAC);
+
 
     //calculate address
     TCGv_i64 offset64 = tcg_temp_new_i64();
     tcg_gen_ext_i32_i64(offset64, offset);
     tcg_gen_add_i64(addr, base, offset64);
     
+    //MAC, bounds, permission checks 
+    gen_helper_cstg(tcg_env, perms, base, offset, size, PT, MAC);
+
     //store from 64-bit x register  
     tcg_gen_ld_i64(value, tcg_env, offsetof(CPUARMState, xregs[a->r]));
     tcg_gen_qemu_st_i64(value, addr, get_mem_index(s), MO_64);

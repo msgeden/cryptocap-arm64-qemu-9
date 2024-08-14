@@ -16,6 +16,7 @@
  * You should have received a copy of the GNU Lesser General Public
  * License along with this library; if not, see <http://www.gnu.org/licenses/>.
  */
+
 DEF_HELPER_FLAGS_2(udiv64, TCG_CALL_NO_RWG_SE, i64, i64, i64)
 DEF_HELPER_FLAGS_2(sdiv64, TCG_CALL_NO_RWG_SE, s64, s64, s64)
 DEF_HELPER_FLAGS_1(rbit64, TCG_CALL_NO_RWG_SE, i64, i64)
@@ -134,4 +135,5 @@ DEF_HELPER_4(cpyfe, void, env, i32, i32, i32)
 
 // //ifdef TARGET_CRYPTO_CAP
 DEF_HELPER_7(cldg, void, env, i64, i64, i32, i32, i64, i64)
+DEF_HELPER_7(cstg, void, env, i64, i64, i32, i32, i64, i64)
 // //endif

@@ -66,7 +66,7 @@ void HELPER(msr_i_spsel)(CPUARMState *env, uint32_t imm)
     update_spsel(env, imm);
 }
 
-static void daif_check(CPUARMState *env, uint32_t op,
+static void daif_check (CPUARMState *env, uint32_t op,
                        uint32_t imm, uintptr_t ra)
 {
     /* DAIF update to PSTATE. This is OK from EL0 only if UMA is set.  */
@@ -75,7 +75,7 @@ static void daif_check(CPUARMState *env, uint32_t op,
                            syn_aa64_sysregtrap(0, extract32(op, 0, 3),
                                                extract32(op, 3, 3), 4,
                                                imm, 0x1f, 0),
-                           exception_target_el(env), ra);
+                          exception_target_el(env), ra);
     }
 }
 
@@ -1862,111 +1862,66 @@ static void do_cldg(CPUARMState *env, uint64_t perms_base, uint32_t offset, uint
     return;
     // do_cldg(env, syndrome, wdesc, rdesc, false, GETPC());
 } 
-//                     uint32_t rdesc, uint32_t move, uintptr_t ra)
-// {
-// //     /* Epilogue: do the last partial page */
-// //     int rd = mops_destreg(syndrome);
-// //     int rs = mops_srcreg(syndrome);
-// //     int rn = mops_sizereg(syndrome);
-// //     uint32_t rmemidx = FIELD_EX32(rdesc, MTEDESC, MIDX);
-// //     uint32_t wmemidx = FIELD_EX32(wdesc, MTEDESC, MIDX);
-// //     bool forwards = true;
-// //     uint64_t toaddr, fromaddr, copysize, step;
 
-// //     check_mops_enabled(env, ra);
+typedef enum capPermFlags {
+    READ = 1,
+    WRITE = 2,
+    EXEC = 4,
+    TRANS = 8,
+} capPermFlagsType;
 
-// //     /* We choose to NOP out "no data to copy" before consistency checks */
-// //     if (env->xregs[rn] == 0) {
-// //         return;
-// //     }
+static bool is_perms_violation(uint64_t perms, capPermFlagsType flag){
+    uint64_t val=(uint64_t)flag;
+    val&=perms;
+    return (val==0);
+}
+static bool is_bounds_violation(uint64_t base, uint32_t offset, uint32_t size){
+    return (offset > size);
+}
+static bool is_MAC_violation(uint64_t perms, uint64_t base, uint32_t offset, uint32_t size, uint64_t PT, uint64_t MAC){
+    bool val=(MAC!=0);
+    return val;
+}
 
-// //     check_mops_wrong_option(env, syndrome, ra);
-
-// //     if (move) {
-// //         forwards = (int64_t)env->xregs[rn] < 0;
-// //     }
-
-// //     if (forwards) {
-// //         toaddr = env->xregs[rd] + env->xregs[rn];
-// //         fromaddr = env->xregs[rs] + env->xregs[rn];
-// //         copysize = -env->xregs[rn];
-// //     } else {
-// //         copysize = env->xregs[rn];
-// //         /* This toaddr and fromaddr point to the *last* byte to copy */
-// //         toaddr = env->xregs[rd] + copysize - 1;
-// //         fromaddr = env->xregs[rs] + copysize - 1;
-// //     }
-
-// //     if (!mte_checks_needed(fromaddr, rdesc)) {
-// //         rdesc = 0;
-// //     }
-// //     if (!mte_checks_needed(toaddr, wdesc)) {
-// //         wdesc = 0;
-// //     }
-
-// //     /* Check the size; we don't want to have do a check-for-interrupts */
-// //     if (copysize >= TARGET_PAGE_SIZE) {
-// //         raise_exception_ra(env, EXCP_UDEF, syndrome,
-// //                            mops_mismatch_exception_target_el(env), ra);
-// //     }
-
-// //     /* Do the actual memmove */
-// //     if (forwards) {
-// //         while (copysize > 0) {
-// //             step = copy_step(env, toaddr, fromaddr, copysize,
-// //                              wmemidx, rmemidx, &wdesc, &rdesc, ra);
-// //             toaddr += step;
-// //             fromaddr += step;
-// //             copysize -= step;
-// //             env->xregs[rn] = -copysize;
-// //         }
-// //     } else {
-// //         while (copysize > 0) {
-// //             step = copy_step_rev(env, toaddr, fromaddr, copysize,
-// //                                  wmemidx, rmemidx, &wdesc, &rdesc, ra);
-// //             toaddr -= step;
-// //             fromaddr -= step;
-// //             copysize -= step;
-// //             env->xregs[rn] = copysize;
-// //         }
-// //     }
-//     return;
-// }
+void HELPER(cstg)(CPUARMState *env, uint64_t perms,  uint64_t base, uint32_t offset, uint32_t size, uint64_t PT, uint64_t MAC)
+{
+    //intra-domain access
+    //if (PT==TBRR){
+    if (PT!=0){
+        return;   
+    }//cross-domain access
+    else{    
+        //check permissions and bounds
+        if (is_MAC_violation(perms, base, offset, size, PT, MAC) ||
+            is_perms_violation(perms, WRITE) ||
+            is_bounds_violation(base, offset, size)) {
+            int syn = syn_data_abort_no_iss(arm_current_el(env) != 0, 0, 0, 0, 0, 1, 0x11);
+            raise_exception_ra(env, EXCP_DATA_ABORT, syn,
+                            exception_target_el(env), GETPC());
+            return; 
+        }
+    }
+    return;
+}
 void HELPER(cldg)(CPUARMState *env, uint64_t perms,  uint64_t base, uint32_t offset, uint32_t size, uint64_t PT, uint64_t MAC)
 {
-    // if (offset > size){
-    //     raise_exception(env, EXCP_UDEF);
-    //     return;
-    // }
-        
-    // uint64_t address = base + offset;
-
-    
-    // // Check bounds
-    // if (offset + size > 64) {
-    //     // Raise an exception or handle the error
-    //     raise_exception(env, EXCP_UDEF);
-    //     return;
-    // }
-    
-    // // Check permissions
-    // if (!check_permissions(env, address, size, PT)) {
-    //     // Raise an exception or handle the error
-    //     raise_exception(env, EXCP_UDEF);
-    //     return;
-    // }
-    
-    // // Perform the load operation
-    // uint64_t data = load_from_memory(env, address, size);
-    
-    // // Verify MAC (Message Authentication Code)
-    // if (!verify_mac(data, MAC)) {
-    //     // Raise an exception or handle the error
-    //     raise_exception(env, EXCP_UDEF);
-    //     return;
-    // }
-    
-
+    //intra-domain access
+    //if (PT==TBRR){
+    if (PT!=0){
+        return;   
+    }//cross-domain access
+    else{    
+        //check permissions and bounds
+        if (is_MAC_violation(perms, base, offset, size, PT, MAC) ||
+            is_perms_violation(perms, READ) || 
+            is_bounds_violation(base, offset, size)) {
+            int syn = syn_data_abort_no_iss(arm_current_el(env) != 0, 0, 0, 0, 0, 0, 0x11);
+            raise_exception_ra(env, EXCP_DATA_ABORT, syn,
+                            exception_target_el(env), GETPC());
+            return;
+        }
+    }
+    return;
      //do_cldg(env, syndrome, wdesc, rdesc, false, GETPC());
 }
 
