@@ -1105,6 +1105,10 @@ static void aarch64_cpu_dump_state(CPUState *cs, FILE *f, int flags)
         ((uint16_t)(env->ccregs[i].perms_base >> 48) & 0xFFFF), (env->ccregs[i].perms_base & 0xFFFFFFFFFFFF), env->ccregs[i].offset, env->ccregs[i].size, env->ccregs[i].PT, env->ccregs[i].MAC,
         "\n");
     }
+
+    qemu_fprintf(f, "TCR=%016" PRIx64 " PTCR=%016" PRIx64 " TTBR0_NS_CC=%016" PRIx64 "%s", env->tcr, env->ptcr, env->ttbr0_ns_cc, "\n");  
+    qemu_fprintf(f, "MKEY.lo=%016" PRIx64 ":.hi=%016" PRIx64 " EKEY.lo=%016" PRIx64 ":.hi=%016" PRIx64 "%s", env->mkey.lo, env->mkey.hi, env->ekey.lo, env->ekey.hi, "\n");  
+    
 //#endif
             
     if (arm_feature(env, ARM_FEATURE_EL3) && el != 3) {

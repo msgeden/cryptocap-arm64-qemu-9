@@ -204,6 +204,11 @@ typedef struct ARMPACKey {
      uint64_t PT;
      uint64_t MAC;
      } ccapreg;
+typedef struct CCKey {
+    uint64_t lo, hi;
+} CCKey;
+
+//#endif
 
 // typedef struct capreg {
 //      uint64_t fields[4];
@@ -235,8 +240,22 @@ typedef struct CPUArchState {
 
 //#ifdef TARGET_CRYPTO_CAP
     //capreg cregs[CAPREG_SIZE];
+    //8 x 256-bit capability registers.
     ccapreg ccregs[CAPREG_SIZE];
-
+    //key register for MAC
+    uint64_t mkey_lo;
+    uint64_t mkey_hi;
+    CCKey mkey;
+    //key register for encryption/decryption 
+    uint64_t ekey_lo;
+    uint64_t ekey_hi;
+    CCKey ekey;
+    //register for temporal identifier 
+    uint64_t tcr;
+    //register for previous temporal identifier 
+    uint64_t ptcr;
+    //secondary PT base register for a separate walk to be triggered by domain-crossing crypto capabilities
+    uint64_t ttbr0_ns_cc;
 //#endif
 
     /* PSTATE isn't an architectural register for ARMv8. However, it is

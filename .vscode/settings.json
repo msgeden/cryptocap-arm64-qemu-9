@@ -17,6 +17,6 @@
         "host-utils.h": "c",
         "streambuf": "cpp"
     },
-    "qemu.test_file":"test_cmem_cstg-cldg",
+    "qemu.test_file":"test_updckeys_readckeys",
     "home":"${env:HOME}",
 }

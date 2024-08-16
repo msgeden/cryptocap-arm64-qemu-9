@@ -34,6 +34,7 @@
 static TCGv_i64 cpu_X[32];
 static TCGv_i64 cpu_pc;
 
+
 /* Load/store exclusive handling */
 static TCGv_i64 cpu_exclusive_high;
 
@@ -63,6 +64,14 @@ static inline TCGv_i32 TCGV_LOWER(TCGv_i64 t)
 {
     return temp_tcgv_i32(tcgv_i64_temp(t) + HOST_BIG_ENDIAN);
 }
+
+static TCGv_i64 cpu_mkey_lo;
+static TCGv_i64 cpu_mkey_hi;
+static TCGv_i64 cpu_ekey_lo;
+static TCGv_i64 cpu_ekey_hi;
+static TCGv_i64 cpu_tcr;
+static TCGv_i64 cpu_ptcr;
+static TCGv_i64 cpu_ttbr0_ns_cc;
 //#endif
 
 enum a64_shift_type {
@@ -162,6 +171,13 @@ void a64_translate_init(void)
                                           offsetof(CPUARMState, ccregs[i].MAC),
                                           name);
     }
+    cpu_mkey_lo = tcg_global_mem_new_i64(tcg_env, offsetof(CPUARMState, mkey.lo), "mkey_lo");
+    cpu_mkey_hi = tcg_global_mem_new_i64(tcg_env, offsetof(CPUARMState, mkey.hi), "mkey_hi");
+    cpu_ekey_lo = tcg_global_mem_new_i64(tcg_env, offsetof(CPUARMState, ekey.lo), "ekey_lo");
+    cpu_ekey_hi = tcg_global_mem_new_i64(tcg_env, offsetof(CPUARMState, ekey.hi), "ekey_hi");
+    cpu_tcr = tcg_global_mem_new_i64(tcg_env, offsetof(CPUARMState, tcr), "tcr");
+    cpu_ptcr = tcg_global_mem_new_i64(tcg_env, offsetof(CPUARMState, ptcr), "ptcr");
+    cpu_ttbr0_ns_cc = tcg_global_mem_new_i64(tcg_env, offsetof(CPUARMState, ttbr0_ns_cc), "ttbr0_ns_cc");
     //#end
 
     cpu_exclusive_high = tcg_global_mem_new_i64(tcg_env,
@@ -1553,7 +1569,62 @@ static bool trans_CSETADDR(DisasContext *s, arg_CSETADDR *a)
     return true;
 }
 
+static bool trans_CSIGN(DisasContext *s, arg_CSIGN *a)
+{
+    //calculate MAC
+    TCGv_i64 crd_idx = tcg_temp_new_i64();
+    tcg_gen_movi_i64(crd_idx, a->crd);
 
+    gen_helper_csign(tcg_env, crd_idx, cpu_CC[a->crs].perms_base, cpu_CC[a->crs].size, cpu_CC[a->crs].PT);
+
+    tcg_gen_mov_i64(cpu_CC[a->crd].perms_base, cpu_CC[a->crs].perms_base);
+    tcg_gen_mov_i32(cpu_CC[a->crd].offset, cpu_CC[a->crs].offset);
+    tcg_gen_mov_i32(cpu_CC[a->crd].size, cpu_CC[a->crs].size);
+    tcg_gen_mov_i64(cpu_CC[a->crd].PT, cpu_CC[a->crs].PT);
+
+    return true;
+}
+
+static bool trans_READTCR(DisasContext *s, arg_READTCR *a)
+{
+    tcg_gen_mov_i64(cpu_X[a->rs], cpu_tcr);
+    return true;
+}
+static bool trans_UPDTCR(DisasContext *s, arg_UPDTCR *a)
+{
+    //check exception level here
+    gen_helper_updtcr(tcg_env);
+    tcg_gen_mov_i64(cpu_ptcr, cpu_tcr);
+    tcg_gen_mov_i64(cpu_tcr, cpu_X[a->rs]);
+    return true;
+}
+
+static bool trans_READCKEYS(DisasContext *s, arg_READCKEYS *a)
+{
+    if (a->imm == 0){//MAC key
+        tcg_gen_mov_i64(cpu_X[a->rs1], cpu_mkey_lo);
+        tcg_gen_mov_i64(cpu_X[a->rs2], cpu_mkey_hi);
+    }
+    else{ //Encryption key
+        tcg_gen_mov_i64(cpu_X[a->rs1], cpu_ekey_lo);
+        tcg_gen_mov_i64(cpu_X[a->rs2], cpu_ekey_hi);
+    } 
+    return true;
+}
+static bool trans_UPDCKEYS(DisasContext *s, arg_UPDCKEYS *a)
+{
+    //check exception level here
+    gen_helper_updckeys(tcg_env);
+    if (a->imm == 0){//MAC key
+        tcg_gen_mov_i64(cpu_mkey_lo, cpu_X[a->rs1]);
+        tcg_gen_mov_i64(cpu_mkey_hi, cpu_X[a->rs2]);
+    }
+    else{ //Encryption key
+        tcg_gen_mov_i64(cpu_ekey_lo, cpu_X[a->rs1]);
+        tcg_gen_mov_i64(cpu_ekey_hi, cpu_X[a->rs2]);
+    } 
+    return true;
+}
 static bool trans_LDC(DisasContext *s, arg_LDC *a)
 {
     TCGv_i64 addr = tcg_temp_new_i64();
@@ -1656,7 +1727,7 @@ static bool trans_CLDG(DisasContext *s, arg_CLDG *a)
     tcg_gen_ext_i32_i64(offset64, offset);
     tcg_gen_add_i64(addr, base, offset64);
 
-    //MAC, bounds, permission checks 
+    //MAC, bounds, permission checks
     gen_helper_cldg(tcg_env, perms, base, offset, size, PT, MAC);
 
     //load to 64-bit x register  
@@ -1666,6 +1737,7 @@ static bool trans_CLDG(DisasContext *s, arg_CLDG *a)
     //ctx->base.pc_next += 4;
     return true;
 }
+
 static bool trans_CSTG(DisasContext *s, arg_CSTG *a)
 {
     TCGv_i64 addr = tcg_temp_new_i64();
@@ -1689,7 +1761,6 @@ static bool trans_CSTG(DisasContext *s, arg_CSTG *a)
     tcg_gen_mov_i64(PT, cpu_CC[a->cr].PT);
     tcg_gen_mov_i64(MAC, cpu_CC[a->cr].MAC);
 
-
     //calculate address
     TCGv_i64 offset64 = tcg_temp_new_i64();
     tcg_gen_ext_i32_i64(offset64, offset);
@@ -1704,7 +1775,16 @@ static bool trans_CSTG(DisasContext *s, arg_CSTG *a)
    
     return true;
 }
+
 static bool trans_CLDC(DisasContext *s, arg_CLDC *a)
+{
+    return true;
+}
+static bool trans_CCALL(DisasContext *s, arg_CCALL *a)
+{
+    return true;
+}
+static bool trans_CRET(DisasContext *s, arg_CRET *a)
 {
     return true;
 }

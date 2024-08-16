@@ -1883,6 +1883,134 @@ static bool is_MAC_violation(uint64_t perms, uint64_t base, uint32_t offset, uin
     return val;
 }
 
+static bool is_privileged_mode(CPUARMState *env){
+    int current_el = arm_current_el(env);
+    //TODO: kernel privileges
+    //return (current_el > 0);
+    return (current_el >= 0);
+}
+
+void HELPER(updtcr)(CPUARMState *env)
+{
+    int current_el = arm_current_el(env);
+    // Check if the current exception level is appropriate (e.g., EL1 or higher)
+    if (!is_privileged_mode(env)) {
+        // Raise an exception if the privilege level is insufficient
+        raise_exception(env, EXCP_UDEF, syn_uncategorized(), exception_target_el(env));
+        return;
+    }
+}
+
+
+void HELPER(updckeys)(CPUARMState *env)
+{
+    int current_el = arm_current_el(env);
+    // Check if the current exception level is appropriate (e.g., EL1 or higher)
+    if (!is_privileged_mode(env)) {
+        // Raise an exception if the privilege level is insufficient
+        raise_exception(env, EXCP_UDEF, syn_uncategorized(), exception_target_el(env));
+        return;
+    }
+}
+// static uint64_t computemac_(uint64_t PT, uint64_t perms_base, uint64_t PT,  
+//                                              ARMPACKey key)
+// {
+//     static const uint64_t RC[5] = {
+//         0x0000000000000000ull,
+//         0x13198A2E03707344ull,
+//         0xA4093822299F31D0ull,
+//         0x082EFA98EC4E6C89ull,
+//         0x452821E638D01377ull,
+//     };
+//     const uint64_t alpha = 0xC0AC29B7C97C50DDull;
+//     int iterations = isqarma3 ? 2 : 4;
+//     /*
+//      * Note that in the ARM pseudocode, key0 contains bits <127:64>
+//      * and key1 contains bits <63:0> of the 128-bit key.
+//      */
+//     uint64_t key0 = key.hi, key1 = key.lo;
+//     uint64_t workingval, runningmod, roundkey, modk0;
+//     int i;
+
+//     modk0 = (key0 << 63) | ((key0 >> 1) ^ (key0 >> 63));
+//     runningmod = modifier;
+//     workingval = data ^ key0;
+
+//     for (i = 0; i <= iterations; ++i) {
+//         roundkey = key1 ^ runningmod;
+//         workingval ^= roundkey;
+//         workingval ^= RC[i];
+//         if (i > 0) {
+//             workingval = pac_cell_shuffle(workingval);
+//             workingval = pac_mult(workingval);
+//         }
+//         if (isqarma3) {
+//             workingval = pac_sub1(workingval);
+//         } else {
+//             workingval = pac_sub(workingval);
+//         }
+//         runningmod = tweak_shuffle(runningmod);
+//     }
+//     roundkey = modk0 ^ runningmod;
+//     workingval ^= roundkey;
+//     workingval = pac_cell_shuffle(workingval);
+//     workingval = pac_mult(workingval);
+//     if (isqarma3) {
+//         workingval = pac_sub1(workingval);
+//     } else {
+//         workingval = pac_sub(workingval);
+//     }
+//     workingval = pac_cell_shuffle(workingval);
+//     workingval = pac_mult(workingval);
+//     workingval ^= key1;
+//     workingval = pac_cell_inv_shuffle(workingval);
+//     if (isqarma3) {
+//         workingval = pac_sub1(workingval);
+//     } else {
+//         workingval = pac_inv_sub(workingval);
+//     }
+//     workingval = pac_mult(workingval);
+//     workingval = pac_cell_inv_shuffle(workingval);
+//     workingval ^= key0;
+//     workingval ^= runningmod;
+//     for (i = 0; i <= iterations; ++i) {
+//         if (isqarma3) {
+//             workingval = pac_sub1(workingval);
+//         } else {
+//             workingval = pac_inv_sub(workingval);
+//         }
+//         if (i < iterations) {
+//             workingval = pac_mult(workingval);
+//             workingval = pac_cell_inv_shuffle(workingval);
+//         }
+//         runningmod = tweak_inv_shuffle(runningmod);
+//         roundkey = key1 ^ runningmod;
+//         workingval ^= RC[iterations - i];
+//         workingval ^= roundkey;
+//         workingval ^= alpha;
+//     }
+//     workingval ^= modk0;
+
+//     return workingval;
+// }
+
+void HELPER(csign)(CPUARMState *env, uint64_t crd_idx, uint64_t perms_base, uint32_t size, uint64_t PT)    
+{
+    uint64_t mkey_l=env->mkey.lo;
+    uint64_t mkey_h=env->mkey.hi;
+    // Check if the current exception level is appropriate (e.g., EL1 or higher)
+    if (!is_privileged_mode(env)) {
+        // Raise an exception if the privilege level is insufficient
+        raise_exception(env, EXCP_UDEF, syn_uncategorized(), exception_target_el(env));
+        return;
+    }
+    uint64_t value=18364758544493064720UL;
+    //poor man's encryption
+    //uint64_t value=perms_base^((uint64_t)size)^PT^mkey_h^mkey_l; 
+    env->ccregs[crd_idx].MAC=value;
+    return;
+}
+
 void HELPER(cstg)(CPUARMState *env, uint64_t perms,  uint64_t base, uint32_t offset, uint32_t size, uint64_t PT, uint64_t MAC)
 {
     // ns: non-secure mode, s: secure mode
