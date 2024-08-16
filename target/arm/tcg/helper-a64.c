@@ -1856,13 +1856,7 @@ void HELPER(cpyfe)(CPUARMState *env, uint32_t syndrome, uint32_t wdesc,
     do_cpye(env, syndrome, wdesc, rdesc, false, GETPC());
 }
 
-// //ifdef TARGET_CRYPTO_CAP
-static void do_cldg(CPUARMState *env, uint64_t perms_base, uint32_t offset, uint32_t size, uint64_t PT, uint64_t MAC)
-{
-    return;
-    // do_cldg(env, syndrome, wdesc, rdesc, false, GETPC());
-} 
-
+//ifdef TARGET_CRYPTO_CAP
 typedef enum capPermFlags {
     READ = 1,
     WRITE = 2,
@@ -1870,17 +1864,266 @@ typedef enum capPermFlags {
     TRANS = 8,
 } capPermFlagsType;
 
+static uint64_t pac_cell_shuffle(uint64_t i)
+{
+    uint64_t o = 0;
+
+    o |= extract64(i, 52, 4);
+    o |= extract64(i, 24, 4) << 4;
+    o |= extract64(i, 44, 4) << 8;
+    o |= extract64(i,  0, 4) << 12;
+
+    o |= extract64(i, 28, 4) << 16;
+    o |= extract64(i, 48, 4) << 20;
+    o |= extract64(i,  4, 4) << 24;
+    o |= extract64(i, 40, 4) << 28;
+
+    o |= extract64(i, 32, 4) << 32;
+    o |= extract64(i, 12, 4) << 36;
+    o |= extract64(i, 56, 4) << 40;
+    o |= extract64(i, 20, 4) << 44;
+
+    o |= extract64(i,  8, 4) << 48;
+    o |= extract64(i, 36, 4) << 52;
+    o |= extract64(i, 16, 4) << 56;
+    o |= extract64(i, 60, 4) << 60;
+
+    return o;
+}
+
+static uint64_t pac_cell_inv_shuffle(uint64_t i)
+{
+    uint64_t o = 0;
+
+    o |= extract64(i, 12, 4);
+    o |= extract64(i, 24, 4) << 4;
+    o |= extract64(i, 48, 4) << 8;
+    o |= extract64(i, 36, 4) << 12;
+
+    o |= extract64(i, 56, 4) << 16;
+    o |= extract64(i, 44, 4) << 20;
+    o |= extract64(i,  4, 4) << 24;
+    o |= extract64(i, 16, 4) << 28;
+
+    o |= i & MAKE_64BIT_MASK(32, 4);
+    o |= extract64(i, 52, 4) << 36;
+    o |= extract64(i, 28, 4) << 40;
+    o |= extract64(i,  8, 4) << 44;
+
+    o |= extract64(i, 20, 4) << 48;
+    o |= extract64(i,  0, 4) << 52;
+    o |= extract64(i, 40, 4) << 56;
+    o |= i & MAKE_64BIT_MASK(60, 4);
+
+    return o;
+}
+
+static uint64_t pac_sub(uint64_t i)
+{
+    static const uint8_t sub1[16] = {
+        0xa, 0xd, 0xe, 0x6, 0xf, 0x7, 0x3, 0x5,
+        0x9, 0x8, 0x0, 0xc, 0xb, 0x1, 0x2, 0x4,
+    };
+    uint64_t o = 0;
+    int b;
+
+    for (b = 0; b < 64; b += 4) {
+        o |= (uint64_t)sub1[(i >> b) & 0xf] << b;
+    }
+    return o;
+}
+
+static uint64_t pac_inv_sub(uint64_t i)
+{
+    static const uint8_t inv_sub[16] = {
+        0x5, 0xe, 0xd, 0x8, 0xa, 0xb, 0x1, 0x9,
+        0x2, 0x6, 0xf, 0x0, 0x4, 0xc, 0x7, 0x3,
+    };
+    uint64_t o = 0;
+    int b;
+
+    for (b = 0; b < 64; b += 4) {
+        o |= (uint64_t)inv_sub[(i >> b) & 0xf] << b;
+    }
+    return o;
+}
+
+static int rot_cell(int cell, int n)
+{
+    /* 4-bit rotate left by n.  */
+    cell |= cell << 4;
+    return extract32(cell, 4 - n, 4);
+}
+
+static uint64_t pac_mult(uint64_t i)
+{
+    uint64_t o = 0;
+    int b;
+
+    for (b = 0; b < 4 * 4; b += 4) {
+        int i0, i4, i8, ic, t0, t1, t2, t3;
+
+        i0 = extract64(i, b, 4);
+        i4 = extract64(i, b + 4 * 4, 4);
+        i8 = extract64(i, b + 8 * 4, 4);
+        ic = extract64(i, b + 12 * 4, 4);
+
+        t0 = rot_cell(i8, 1) ^ rot_cell(i4, 2) ^ rot_cell(i0, 1);
+        t1 = rot_cell(ic, 1) ^ rot_cell(i4, 1) ^ rot_cell(i0, 2);
+        t2 = rot_cell(ic, 2) ^ rot_cell(i8, 1) ^ rot_cell(i0, 1);
+        t3 = rot_cell(ic, 1) ^ rot_cell(i8, 2) ^ rot_cell(i4, 1);
+
+        o |= (uint64_t)t3 << b;
+        o |= (uint64_t)t2 << (b + 4 * 4);
+        o |= (uint64_t)t1 << (b + 8 * 4);
+        o |= (uint64_t)t0 << (b + 12 * 4);
+    }
+    return o;
+}
+
+static uint64_t tweak_cell_rot(uint64_t cell)
+{
+    return (cell >> 1) | (((cell ^ (cell >> 1)) & 1) << 3);
+}
+
+static uint64_t tweak_shuffle(uint64_t i)
+{
+    uint64_t o = 0;
+
+    o |= extract64(i, 16, 4) << 0;
+    o |= extract64(i, 20, 4) << 4;
+    o |= tweak_cell_rot(extract64(i, 24, 4)) << 8;
+    o |= extract64(i, 28, 4) << 12;
+
+    o |= tweak_cell_rot(extract64(i, 44, 4)) << 16;
+    o |= extract64(i,  8, 4) << 20;
+    o |= extract64(i, 12, 4) << 24;
+    o |= tweak_cell_rot(extract64(i, 32, 4)) << 28;
+
+    o |= extract64(i, 48, 4) << 32;
+    o |= extract64(i, 52, 4) << 36;
+    o |= extract64(i, 56, 4) << 40;
+    o |= tweak_cell_rot(extract64(i, 60, 4)) << 44;
+
+    o |= tweak_cell_rot(extract64(i,  0, 4)) << 48;
+    o |= extract64(i,  4, 4) << 52;
+    o |= tweak_cell_rot(extract64(i, 40, 4)) << 56;
+    o |= tweak_cell_rot(extract64(i, 36, 4)) << 60;
+
+    return o;
+}
+
+static uint64_t tweak_cell_inv_rot(uint64_t cell)
+{
+    return ((cell << 1) & 0xf) | ((cell & 1) ^ (cell >> 3));
+}
+
+static uint64_t tweak_inv_shuffle(uint64_t i)
+{
+    uint64_t o = 0;
+
+    o |= tweak_cell_inv_rot(extract64(i, 48, 4));
+    o |= extract64(i, 52, 4) << 4;
+    o |= extract64(i, 20, 4) << 8;
+    o |= extract64(i, 24, 4) << 12;
+
+    o |= extract64(i,  0, 4) << 16;
+    o |= extract64(i,  4, 4) << 20;
+    o |= tweak_cell_inv_rot(extract64(i,  8, 4)) << 24;
+    o |= extract64(i, 12, 4) << 28;
+
+    o |= tweak_cell_inv_rot(extract64(i, 28, 4)) << 32;
+    o |= tweak_cell_inv_rot(extract64(i, 60, 4)) << 36;
+    o |= tweak_cell_inv_rot(extract64(i, 56, 4)) << 40;
+    o |= tweak_cell_inv_rot(extract64(i, 16, 4)) << 44;
+
+    o |= extract64(i, 32, 4) << 48;
+    o |= extract64(i, 36, 4) << 52;
+    o |= extract64(i, 40, 4) << 56;
+    o |= tweak_cell_inv_rot(extract64(i, 44, 4)) << 60;
+
+    return o;
+}
+
+
+static uint64_t qarma_block_encrypt(uint64_t plaintext, CCKey key)
+{
+    static const uint64_t RC[5] = {
+        0x0000000000000000ull,
+        0x13198A2E03707344ull,
+        0xA4093822299F31D0ull,
+        0x082EFA98EC4E6C89ull,
+        0x452821E638D01377ull,
+    };
+    int iterations = 2;
+    uint64_t key0 = key.hi, key1 = key.lo;
+    uint64_t state, roundkey;
+    int i;
+
+    state = plaintext ^ key0;
+
+    for (i = 0; i <= iterations; ++i) {
+        roundkey = key1;
+        state ^= roundkey;
+        state ^= RC[i];
+        if (i > 0) {
+            state = pac_cell_shuffle(state);
+            state = pac_mult(state);
+        }
+        state = pac_sub(state);
+    }
+
+    state ^= key1;
+    state = pac_cell_shuffle(state);
+    state = pac_mult(state);
+    state = pac_sub(state);
+    state = pac_cell_shuffle(state);
+    state = pac_mult(state);
+    state ^= key0;
+
+    return state;
+}
+
+static uint64_t qarma_mac(uint64_t data1, uint64_t data2,  uint64_t data3,  uint32_t data4, CCKey key)
+{
+    uint64_t mac = 0;  // Initialization vector
+    
+    // First block
+    mac = qarma_block_encrypt(data1 ^ mac, key);
+    
+    // Second block
+    mac = qarma_block_encrypt(data2 ^ mac, key);
+
+    // Third block
+    mac = qarma_block_encrypt(data3 ^ mac, key);
+    
+    // Fourth block (padded)
+    uint64_t last_block = ((uint64_t)data4 << 32) | 0x80000000;  // Padding
+    mac = qarma_block_encrypt(last_block ^ mac, key);
+    
+    return mac;
+}
+
+static uint64_t computeMAC(uint64_t tcr, uint64_t perms_base, uint64_t PT, uint32_t size, CCKey mkey){
+    return qarma_mac(tcr, perms_base, PT, size, mkey);
+}
+
 static bool is_perms_violation(uint64_t perms, capPermFlagsType flag){
     uint64_t val=(uint64_t)flag;
     val&=perms;
     return (val==0);
 }
+
 static bool is_bounds_violation(uint64_t base, uint32_t offset, uint32_t size){
     return (offset > size);
 }
-static bool is_MAC_violation(uint64_t perms, uint64_t base, uint32_t offset, uint32_t size, uint64_t PT, uint64_t MAC){
-    bool val=(MAC!=0);
-    return val;
+
+static bool is_MAC_violation(uint64_t tcr, uint64_t perms_base, uint32_t size, uint64_t PT, uint64_t MAC, CCKey mkey){
+    //TODO: remove following condition
+    if (MAC==0) 
+        return false;
+    uint64_t refMAC=computeMAC(tcr, perms_base, PT, size, mkey);
+    return (MAC!=refMAC);
 }
 
 static bool is_privileged_mode(CPUARMState *env){
@@ -1890,9 +2133,18 @@ static bool is_privileged_mode(CPUARMState *env){
     return (current_el >= 0);
 }
 
+static bool is_cross_domain(CPUARMState *env, uint64_t PT){
+    // ns: non-secure mode, s: secure mode
+    // TTBR0: base register 0 (typically user space)
+    // TTBR1: base register 1 (@should be for kernel space) we're using TTBR0_EL1, adjust if needed
+    uint64_t ttbr = env->cp15.ttbr0_ns;  // ns for non-secure mode s for secure mod we're using TTBR0_EL1, adjust if needed
+    //TODO: PT base register
+    //return (ttbr != PT);
+    return (PT != 0);
+}
+
 void HELPER(updtcr)(CPUARMState *env)
 {
-    int current_el = arm_current_el(env);
     // Check if the current exception level is appropriate (e.g., EL1 or higher)
     if (!is_privileged_mode(env)) {
         // Raise an exception if the privilege level is insufficient
@@ -1900,11 +2152,9 @@ void HELPER(updtcr)(CPUARMState *env)
         return;
     }
 }
-
 
 void HELPER(updckeys)(CPUARMState *env)
 {
-    int current_el = arm_current_el(env);
     // Check if the current exception level is appropriate (e.g., EL1 or higher)
     if (!is_privileged_mode(env)) {
         // Raise an exception if the privilege level is insufficient
@@ -1912,121 +2162,35 @@ void HELPER(updckeys)(CPUARMState *env)
         return;
     }
 }
-// static uint64_t computemac_(uint64_t PT, uint64_t perms_base, uint64_t PT,  
-//                                              ARMPACKey key)
-// {
-//     static const uint64_t RC[5] = {
-//         0x0000000000000000ull,
-//         0x13198A2E03707344ull,
-//         0xA4093822299F31D0ull,
-//         0x082EFA98EC4E6C89ull,
-//         0x452821E638D01377ull,
-//     };
-//     const uint64_t alpha = 0xC0AC29B7C97C50DDull;
-//     int iterations = isqarma3 ? 2 : 4;
-//     /*
-//      * Note that in the ARM pseudocode, key0 contains bits <127:64>
-//      * and key1 contains bits <63:0> of the 128-bit key.
-//      */
-//     uint64_t key0 = key.hi, key1 = key.lo;
-//     uint64_t workingval, runningmod, roundkey, modk0;
-//     int i;
-
-//     modk0 = (key0 << 63) | ((key0 >> 1) ^ (key0 >> 63));
-//     runningmod = modifier;
-//     workingval = data ^ key0;
-
-//     for (i = 0; i <= iterations; ++i) {
-//         roundkey = key1 ^ runningmod;
-//         workingval ^= roundkey;
-//         workingval ^= RC[i];
-//         if (i > 0) {
-//             workingval = pac_cell_shuffle(workingval);
-//             workingval = pac_mult(workingval);
-//         }
-//         if (isqarma3) {
-//             workingval = pac_sub1(workingval);
-//         } else {
-//             workingval = pac_sub(workingval);
-//         }
-//         runningmod = tweak_shuffle(runningmod);
-//     }
-//     roundkey = modk0 ^ runningmod;
-//     workingval ^= roundkey;
-//     workingval = pac_cell_shuffle(workingval);
-//     workingval = pac_mult(workingval);
-//     if (isqarma3) {
-//         workingval = pac_sub1(workingval);
-//     } else {
-//         workingval = pac_sub(workingval);
-//     }
-//     workingval = pac_cell_shuffle(workingval);
-//     workingval = pac_mult(workingval);
-//     workingval ^= key1;
-//     workingval = pac_cell_inv_shuffle(workingval);
-//     if (isqarma3) {
-//         workingval = pac_sub1(workingval);
-//     } else {
-//         workingval = pac_inv_sub(workingval);
-//     }
-//     workingval = pac_mult(workingval);
-//     workingval = pac_cell_inv_shuffle(workingval);
-//     workingval ^= key0;
-//     workingval ^= runningmod;
-//     for (i = 0; i <= iterations; ++i) {
-//         if (isqarma3) {
-//             workingval = pac_sub1(workingval);
-//         } else {
-//             workingval = pac_inv_sub(workingval);
-//         }
-//         if (i < iterations) {
-//             workingval = pac_mult(workingval);
-//             workingval = pac_cell_inv_shuffle(workingval);
-//         }
-//         runningmod = tweak_inv_shuffle(runningmod);
-//         roundkey = key1 ^ runningmod;
-//         workingval ^= RC[iterations - i];
-//         workingval ^= roundkey;
-//         workingval ^= alpha;
-//     }
-//     workingval ^= modk0;
-
-//     return workingval;
-// }
 
 void HELPER(csign)(CPUARMState *env, uint64_t crd_idx, uint64_t perms_base, uint32_t size, uint64_t PT)    
 {
-    uint64_t mkey_l=env->mkey.lo;
-    uint64_t mkey_h=env->mkey.hi;
     // Check if the current exception level is appropriate (e.g., EL1 or higher)
     if (!is_privileged_mode(env)) {
         // Raise an exception if the privilege level is insufficient
         raise_exception(env, EXCP_UDEF, syn_uncategorized(), exception_target_el(env));
         return;
     }
-    uint64_t value=18364758544493064720UL;
-    //poor man's encryption
-    //uint64_t value=perms_base^((uint64_t)size)^PT^mkey_h^mkey_l; 
+    uint64_t tcr = env->tcr;  // ns for non-secure mode s for secure mod we're using TTBR0_EL1, adjust if needed
+    CCKey mkey=env->mkey;
+    uint64_t value=computeMAC(tcr, perms_base, PT, size, mkey);
     env->ccregs[crd_idx].MAC=value;
     return;
 }
 
-void HELPER(cstg)(CPUARMState *env, uint64_t perms,  uint64_t base, uint32_t offset, uint32_t size, uint64_t PT, uint64_t MAC)
+void HELPER(cstg)(CPUARMState *env, uint64_t perms_base, uint32_t offset, uint32_t size, uint64_t PT, uint64_t MAC)
 {
-    // ns: non-secure mode, s: secure mode
-    // TTBR0: base register 0 (typically user space)
-    // TTBR1: base register 1 (@should be for kernel space) we're using TTBR0_EL1, adjust if needed
-    //if (PT==TBRR){
-    uint64_t ttbr = env->cp15.ttbr0_ns;  // ns for non-secure mode s for secure mod we're using TTBR0_EL1, adjust if needed
-    //uint64_t ttbr = env->cp15.ttbr0_el[1];  // Assuming we're using TTBR0_EL1, adjust if needed
+    uint64_t perms = (perms_base >> 48);  
+    uint64_t base = (perms_base && 0x0000FFFFFFFFFFFF);  
+    uint64_t tcr = env->tcr;   
+    CCKey mkey=env->mkey;
     //intra-domain access
-    //if (PT==TBRR){
-    if (PT==ttbr){
-        return;   
+    if (!is_cross_domain(env, PT)){
+       return;   
     }//cross-domain access
     else{    
         //check permissions and bounds
-        if (is_MAC_violation(perms, base, offset, size, PT, MAC) ||
+        if (is_MAC_violation(tcr, perms_base, size, PT, MAC, mkey) ||
             is_perms_violation(perms, WRITE) ||
             is_bounds_violation(base, offset, size)) {
             int syn = syn_data_abort_no_iss(arm_current_el(env) != 0, 0, 0, 0, 0, 1, 0x11);
@@ -2037,16 +2201,19 @@ void HELPER(cstg)(CPUARMState *env, uint64_t perms,  uint64_t base, uint32_t off
     }
     return;
 }
-void HELPER(cldg)(CPUARMState *env, uint64_t perms,  uint64_t base, uint32_t offset, uint32_t size, uint64_t PT, uint64_t MAC)
+void HELPER(cldg)(CPUARMState *env, uint64_t perms_base, uint32_t offset, uint32_t size, uint64_t PT, uint64_t MAC)
 {
+    uint64_t perms = (perms_base >> 48);  
+    uint64_t base = (perms_base && 0x0000FFFFFFFFFFFF);  
+    uint64_t tcr = env->tcr;   
+    CCKey mkey=env->mkey;
     //intra-domain access
-    //if (PT==TBRR){
-    if (PT!=0){
-        return;   
+    if (!is_cross_domain(env, PT)){
+       return;   
     }//cross-domain access
     else{    
-        //check permissions and bounds
-        if (is_MAC_violation(perms, base, offset, size, PT, MAC) ||
+       //check permissions and bounds
+        if (is_MAC_violation(tcr, perms_base, size, PT, MAC, mkey) ||
             is_perms_violation(perms, READ) || 
             is_bounds_violation(base, offset, size)) {
             int syn = syn_data_abort_no_iss(arm_current_el(env) != 0, 0, 0, 0, 0, 0, 0x11);
@@ -2056,8 +2223,5 @@ void HELPER(cldg)(CPUARMState *env, uint64_t perms,  uint64_t base, uint32_t off
         }
     }
     return;
-     //do_cldg(env, syndrome, wdesc, rdesc, false, GETPC());
 }
-
-
 //endif
