@@ -26,6 +26,7 @@
 &crd_crs_rs crd crs rs      
 &imm_idx_cr_r imm idx cr r  
 &imm_idx_r_cr imm idx r cr  
+&crs crs  
 &rs rs  
 &imm_rs1_rs2 imm rs1 rs2
 &nill   
@@ -38,6 +39,7 @@
 @op_imm_idx_cr_r        ... .... ..... imm:8 idx:2 cr:5 r:5 &imm_idx_cr_r
 @op_imm_idx_r_cr        ... .... ..... imm:8 idx:2 r:5 cr:5 &imm_idx_r_cr
 @op_rs                  ... .... ..... ..... ..... ..... rs:5 &rs
+@op_crs                 ... .... ..... ..... ..... ..... crs:5 &crs
 @op_imm_rs1_rs2         ... .... ..... ..... .... imm:1 rs1:5 rs2:5 &imm_rs1_rs2
 @op_nill                ... .... ..... ..... ..... ..... ..... &nill
 
@@ -50,7 +52,7 @@ CSETBASE    000 0001 00101 00000 ..... ..... .....  @op_crd_crs_rs
 CSETSIZE    000 0001 00110 00000 ..... ..... .....  @op_crd_crs_rs
 CSETPERMS   000 0001 00111 00000 ..... ..... .....  @op_crd_crs_rs
 CSETADDR    000 0001 01000 00000 ..... ..... .....  @op_crd_crs_rs
-CSIGN       000 0001 01001 00000 00000 ..... .....  @op_crd_crs
+CSIGN       000 0001 01001 00000 00000 00000 .....  @op_crs
 
 #OTHER INSTRUCTIONS
 READTCR     000 0001 01010 00000 00000 00000 .....  @op_rs

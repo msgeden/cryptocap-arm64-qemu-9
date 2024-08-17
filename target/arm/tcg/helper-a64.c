@@ -2163,7 +2163,7 @@ void HELPER(updckeys)(CPUARMState *env)
     }
 }
 
-void HELPER(csign)(CPUARMState *env, uint64_t crd_idx, uint64_t perms_base, uint32_t size, uint64_t PT)    
+void HELPER(csign)(CPUARMState *env, uint64_t crs_idx, uint64_t perms_base, uint32_t size, uint64_t PT, uint64_t MAC)    
 {
     // Check if the current exception level is appropriate (e.g., EL1 or higher)
     if (!is_privileged_mode(env)) {
@@ -2171,10 +2171,33 @@ void HELPER(csign)(CPUARMState *env, uint64_t crd_idx, uint64_t perms_base, uint
         raise_exception(env, EXCP_UDEF, syn_uncategorized(), exception_target_el(env));
         return;
     }
-    uint64_t tcr = env->tcr;  // ns for non-secure mode s for secure mod we're using TTBR0_EL1, adjust if needed
+    //creating a capability from metadata on the fly
+    //important this should be done before switching PT as the host PT cannot be lost
     CCKey mkey=env->mkey;
-    uint64_t value=computeMAC(tcr, perms_base, PT, size, mkey);
-    env->ccregs[crd_idx].MAC=value;
+    uint64_t tcr = env->tcr;
+    uint64_t ptcr = env->ptcr;
+
+    uint64_t MACval=0;
+    //assuming TCR is updated for the call and resigning a capability
+    //TODO:
+    //if (is_cross_domain(env, PT)){
+    if (is_cross_domain(env, MAC)){
+        if (is_MAC_violation(ptcr, perms_base, size, PT, MAC, mkey)){
+            int syn = syn_data_abort_no_iss(arm_current_el(env) != 0, 0, 0, 0, 0, 1, 0x11);
+            raise_exception_ra(env, EXCP_DATA_ABORT, syn,
+                            exception_target_el(env), GETPC());
+            return;
+        }
+        MACval=computeMAC(tcr, perms_base, PT, size, mkey);
+        env->ccregs[crs_idx].MAC=MACval;
+        
+    }//creation of a capability for the first time
+    else{
+        uint64_t ttbr = env->cp15.ttbr0_ns;
+        env->ccregs[crs_idx].PT=ttbr;
+        MACval=computeMAC(tcr, perms_base, ttbr, size, mkey);
+        env->ccregs[crs_idx].MAC=MACval;
+    } 
     return;
 }
 

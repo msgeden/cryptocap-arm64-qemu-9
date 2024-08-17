@@ -1572,15 +1572,15 @@ static bool trans_CSETADDR(DisasContext *s, arg_CSETADDR *a)
 static bool trans_CSIGN(DisasContext *s, arg_CSIGN *a)
 {
     //calculate MAC
-    TCGv_i64 crd_idx = tcg_temp_new_i64();
-    tcg_gen_movi_i64(crd_idx, a->crd);
+    TCGv_i64 crs_idx = tcg_temp_new_i64();
+    tcg_gen_movi_i64(crs_idx, a->crs);
 
-    gen_helper_csign(tcg_env, crd_idx, cpu_CC[a->crs].perms_base, cpu_CC[a->crs].size, cpu_CC[a->crs].PT);
+    gen_helper_csign(tcg_env, crs_idx, cpu_CC[a->crs].perms_base, cpu_CC[a->crs].size, cpu_CC[a->crs].PT, cpu_CC[a->crs].MAC);
 
-    tcg_gen_mov_i64(cpu_CC[a->crd].perms_base, cpu_CC[a->crs].perms_base);
-    tcg_gen_mov_i32(cpu_CC[a->crd].offset, cpu_CC[a->crs].offset);
-    tcg_gen_mov_i32(cpu_CC[a->crd].size, cpu_CC[a->crs].size);
-    tcg_gen_mov_i64(cpu_CC[a->crd].PT, cpu_CC[a->crs].PT);
+    //tcg_gen_mov_i64(cpu_CC[a->crd].perms_base, cpu_CC[a->crs].perms_base);
+    //tcg_gen_mov_i32(cpu_CC[a->crd].offset, cpu_CC[a->crs].offset);
+    //tcg_gen_mov_i32(cpu_CC[a->crd].size, cpu_CC[a->crs].size);
+    //tcg_gen_mov_i64(cpu_CC[a->crd].PT, cpu_CC[a->crs].PT);
 
     return true;
 }
