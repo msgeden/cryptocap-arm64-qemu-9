@@ -2222,6 +2222,7 @@ void HELPER(cstg)(CPUARMState *env, uint64_t perms_base, uint32_t offset, uint32
             return; 
         }
     }
+    
     return;
 }
 void HELPER(cldg)(CPUARMState *env, uint64_t perms_base, uint32_t offset, uint32_t size, uint64_t PT, uint64_t MAC)
