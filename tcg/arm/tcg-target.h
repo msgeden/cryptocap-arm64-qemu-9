@@ -131,7 +131,7 @@ extern bool use_neon_instructions;
 #define TCG_TARGET_HAS_v128             use_neon_instructions
 //#define TCG_TARGET_HAS_v256             0
 //TARGET_CRYPTO_CAP
-#define              1
+#define TCG_TARGET_HAS_v256             1
 //TARGET_CRYPTO_CAP
 #define TCG_TARGET_HAS_andc_vec         1
 #define TCG_TARGET_HAS_orc_vec          1

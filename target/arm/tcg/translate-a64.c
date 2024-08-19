@@ -44,11 +44,6 @@ static const char *regnames[] = {
     "x16", "x17", "x18", "x19", "x20", "x21", "x22", "x23",
     "x24", "x25", "x26", "x27", "x28", "x29", "lr", "sp"
 };
-
-//#ifdef TARGET_CRYPTO_CAP
-// typedef struct TCGv_i64_x4 {
-//     TCGv_i64 parts[4];
-// } TCGv_i64_x4;
 typedef struct TCGv_c256 {
     TCGv_i64 perms_base;
     TCGv_i32 offset;
@@ -137,16 +132,6 @@ void a64_translate_init(void)
                                           offsetof(CPUARMState, xregs[i]),
                                           regnames[i]);
     }
-    //#ifdef TARGET_CRYPTO_CAP
-    // for (i = 0; i < CAPREG_SIZE; i++) {
-    //     for (int j = 0; j < CAPREG_WIDTH; j++) {
-    //         char name[12];
-    //         snprintf(name, sizeof(name), "c%d_%d", i, j);
-    //         cpu_C[i].parts[j] = tcg_global_mem_new_i64(tcg_env,
-    //                                       offsetof(CPUARMState, cregs[i].fields[j]),
-    //                                       name);
-    //     }
-    // }
     
     for (i = 0; i < CAPREG_SIZE; i++) {
         char name[15];

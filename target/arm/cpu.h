@@ -239,21 +239,18 @@ typedef struct CPUArchState {
     uint64_t pc;
 
 //#ifdef TARGET_CRYPTO_CAP
-    //capreg cregs[CAPREG_SIZE];
     //8 x 256-bit capability registers.
     ccapreg ccregs[CAPREG_SIZE];
     //key register for MAC
-    uint64_t mkey_lo;
-    uint64_t mkey_hi;
     CCKey mkey;
     //key register for encryption/decryption 
-    uint64_t ekey_lo;
-    uint64_t ekey_hi;
     CCKey ekey;
     //register for temporal identifier 
     uint64_t tcr;
     //register for previous temporal identifier 
     uint64_t ptcr;
+    //cross-domain access flag for MMU
+    bool cross_domain_access;
     //secondary PT base register for a separate walk to be triggered by domain-crossing crypto capabilities
     uint64_t ttbr0_ns_cc;
 //#endif
