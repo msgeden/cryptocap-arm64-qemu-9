@@ -2261,8 +2261,89 @@ void HELPER(cldg)(CPUARMState *env, uint64_t r_idx, uint64_t perms_base, uint32_
     return;
 }
 
-void HELPER(cldc)(CPUARMState *env, uint64_t r_idx, uint64_t perms_base, uint32_t offset, uint32_t size, uint64_t PT, uint64_t MAC)
+void HELPER(cldc)(CPUARMState *env, uint64_t crd_idx, uint64_t perms_base, uint32_t offset, uint32_t size, uint64_t PT, uint64_t MAC)
 {
+    uint64_t perms = (perms_base >> 48);  
+    uint64_t base = (perms_base & 0x0000FFFFFFFFFFFF);  
+    uint64_t addr= base+(uint64_t)offset;
+    uint64_t tcr = env->tcr; 
+    uint64_t dest_perms_base=0;
+    uint32_t dest_offset=0;
+    uint32_t dest_size=0;
+    uint64_t dest_PT=0;
+    uint64_t dest_MAC=0;
+    
+    uint64_t val32=0;
+    CCKey mkey=env->mkey;
+    //intra-domain access
+    if (!is_cross_domain(env, PT)){
+        
+        //perms_base
+        dest_perms_base = cpu_ldq_data(env, addr);
+        env->ccregs[crd_idx].perms_base = dest_perms_base;
+        addr+=8;
+        
+        //offset
+        dest_offset=cpu_ldl_data(env, addr);
+        env->ccregs[crd_idx].offset = dest_offset;
+        addr+=4;
+        
+        //size
+        dest_size=cpu_ldl_data(env, addr);
+        env->ccregs[crd_idx].size = dest_size;
+        addr+=4;
+
+        //PT
+        dest_PT = cpu_ldq_data(env, addr);
+        env->ccregs[crd_idx].PT = dest_PT;
+        addr+=8;
+
+        //MAC
+        dest_MAC = cpu_ldq_data(env, addr);
+        env->ccregs[crd_idx].MAC = dest_MAC;
+        
+        return;   
+    }//cross-domain access
+    else{    
+        //check permissions and bounds
+        if (is_MAC_violation(tcr, perms_base, size, PT, MAC, mkey) ||
+            is_perms_violation(perms, READ) || 
+            is_bounds_violation(base, offset, size)) {
+            int syn = syn_data_abort_no_iss(arm_current_el(env) != 0, 0, 0, 0, 0, 0, 0x11);
+            raise_exception_ra(env, EXCP_DATA_ABORT, syn,
+                            exception_target_el(env), GETPC());
+            return;
+        }
+
+        //perms_base
+        dest_perms_base = cpu_ldq_data(env, addr);
+        env->ccregs[crd_idx].perms_base = dest_perms_base;
+        addr+=8;
+
+        //offset
+        dest_offset=cpu_ldl_data(env, addr);
+        env->ccregs[crd_idx].offset = dest_offset;
+        addr+=4;
+
+        //size
+        dest_size=cpu_ldl_data(env, addr);
+        env->ccregs[crd_idx].size = dest_size;
+        addr+=4;
+
+        //PT
+        dest_PT = cpu_ldq_data(env, addr);
+        env->ccregs[crd_idx].PT = dest_PT;
+        addr+=8;
+
+        //MAC
+        uint64_t dest_perms = (dest_perms_base >> 48); 
+        //if the capability being loaded has transitive closure feature, update its MAC for the new call context (TCR) 
+        if (!is_perms_violation(dest_perms, TRANS))
+            dest_MAC=computeMAC(tcr, perms_base, PT, size, mkey);
+        else
+            dest_MAC = cpu_ldq_data(env, addr);
+        env->ccregs[crd_idx].MAC = dest_MAC;
+    }
     return;
 }
 //endif
