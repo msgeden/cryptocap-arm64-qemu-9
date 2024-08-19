@@ -1758,13 +1758,36 @@ static bool trans_CLDC(DisasContext *s, arg_CLDC *a)
     //MAC, bounds, permission checks
     gen_helper_cldc(tcg_env, crd_idx, perms_base, offset, size, PT, MAC);
  
-    return true;}
-static bool trans_CCALL(DisasContext *s, arg_CCALL *a)
-{
     return true;
 }
+
+#define CCALL_HANDLER_ADDR 0x0000FFFF;
+#define CRET_HANDLER_ADDR 0xFFFFFFFF;
+
+static bool trans_CCALL(DisasContext *s, arg_CCALL *a)
+{
+    //TCGv_i32 mode = tcg_const_i32(1);
+    TCGv_i64 target_id = tcg_temp_new_i64();
+    TCGv_i64 handler = tcg_temp_new_i64();
+    uint64_t ccall_handler_addr = CCALL_HANDLER_ADDR;
+    handler = tcg_constant_i64(ccall_handler_addr);
+    tcg_gen_mov_i64(target_id,  cpu_X[a->rs]);
+
+    // Switch to kernel mode
+    gen_helper_ccall(tcg_env, handler, target_id);
+
+    // Jump to ccall_handler
+    //gen_goto_tb(s, 0, handler_addr);
+
+    return true;
+}
+
 static bool trans_CRET(DisasContext *s, arg_CRET *a)
 {
+    TCGv_i64 handler = tcg_temp_new_i64();
+    uint64_t cret_handler_addr = CRET_HANDLER_ADDR;
+    handler = tcg_constant_i64(cret_handler_addr);
+    gen_helper_cret(tcg_env, handler);
     return true;
 }
 //#endif 

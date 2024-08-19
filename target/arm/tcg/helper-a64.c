@@ -2346,4 +2346,47 @@ void HELPER(cldc)(CPUARMState *env, uint64_t crd_idx, uint64_t perms_base, uint3
     }
     return;
 }
+
+void HELPER(ccall)(CPUARMState *env, uint64_t handler, uint64_t rs)
+{
+    // Switch to EL1 mode
+    //env->pstate = PSTATE_MODE_EL1h;
+
+    //env->pstate = (env->pstate & ~PSTATE_EL_MASK) | PSTATE_EL1;
+    //unsigned int target_el=1;
+    int current_el = arm_current_el(env);
+    env->pstate = aarch64_pstate_mode(1, true);
+    current_el = arm_current_el(env);
+
+    // Additional EL1 setup if needed
+
+    // For example, you might want to update other CPU state registers
+    // Setting up system registers specific to EL1, such as SCTLR_EL1 (System Control Register for EL1).
+    // Configuring memory management registers like TTBR0_EL1 and TTBR1_EL1 (Translation Table Base Registers).
+    // Setting up exception handling registers like VBAR_EL1 (Vector Base Address Register).
+    // Configuring timer registers specific to EL1, such as CNTKCTL_EL1.
+    // Adjusting the Stack Pointer for EL1 (SP_EL1).
+    // Setting up any necessary virtual memory mappings for EL1.
+    // Configuring interrupt routing and masking appropriate for EL1.
+    //These setups would involve writing to the respective system registers and updating the CPU state accordingly. The exact implementation would depend on the specific requirements of your system and the ARM architecture version you're working with.
+
+    // The 'rs' parameter can be used if you need to pass any additional information
+
+    // Ensure the CPU recognizes the mode change
+    arm_rebuild_hflags(env);
+    return;
+}
+
+
+void HELPER(cret)(CPUARMState *env, uint64_t handler)
+{
+    int current_el = arm_current_el(env);
+    //env->pstate = aarch64_pstate_mode(1, true);
+    env->pstate = PSTATE_MODE_EL1h;
+    current_el = arm_current_el(env);
+
+    arm_rebuild_hflags(env);
+
+    return;
+}
 //endif

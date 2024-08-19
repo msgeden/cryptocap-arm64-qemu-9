@@ -17,6 +17,6 @@
         "host-utils.h": "c",
         "streambuf": "cpp"
     },
-    "qemu.test_file":"test_cldc",
+    "qemu.test_file":"test_ccall_cret",
     "home":"${env:HOME}",
 }
