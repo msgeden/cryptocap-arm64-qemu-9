@@ -2201,15 +2201,18 @@ void HELPER(csign)(CPUARMState *env, uint64_t crs_idx, uint64_t perms_base, uint
     return;
 }
 
-void HELPER(cstg)(CPUARMState *env, uint64_t perms_base, uint32_t offset, uint32_t size, uint64_t PT, uint64_t MAC)
+void HELPER(cstg)(CPUARMState *env, uint64_t r_idx, uint64_t perms_base, uint32_t offset, uint32_t size, uint64_t PT, uint64_t MAC)
 {
     uint64_t perms = (perms_base >> 48);  
-    uint64_t base = (perms_base && 0x0000FFFFFFFFFFFF);  
-    uint64_t tcr = env->tcr;   
+    uint64_t base = (perms_base & 0x0000FFFFFFFFFFFF);  
+    uint64_t addr= base+(uint64_t)offset;
+    uint64_t tcr = env->tcr; 
+    uint64_t value=env->xregs[r_idx];
     CCKey mkey=env->mkey;
     //intra-domain access
     if (!is_cross_domain(env, PT)){
-       return;   
+        cpu_stq_data(env, addr, value); 
+        return;   
     }//cross-domain access
     else{    
         //check permissions and bounds
@@ -2219,21 +2222,28 @@ void HELPER(cstg)(CPUARMState *env, uint64_t perms_base, uint32_t offset, uint32
             int syn = syn_data_abort_no_iss(arm_current_el(env) != 0, 0, 0, 0, 0, 1, 0x11);
             raise_exception_ra(env, EXCP_DATA_ABORT, syn,
                             exception_target_el(env), GETPC());
-            return; 
+            
         }
-    }
+        cpu_stq_data(env, addr, value); 
+        return; 
     
+    }
     return;
 }
-void HELPER(cldg)(CPUARMState *env, uint64_t perms_base, uint32_t offset, uint32_t size, uint64_t PT, uint64_t MAC)
+
+void HELPER(cldg)(CPUARMState *env, uint64_t r_idx, uint64_t perms_base, uint32_t offset, uint32_t size, uint64_t PT, uint64_t MAC)
 {
     uint64_t perms = (perms_base >> 48);  
-    uint64_t base = (perms_base && 0x0000FFFFFFFFFFFF);  
-    uint64_t tcr = env->tcr;   
+    uint64_t base = (perms_base & 0x0000FFFFFFFFFFFF);  
+    uint64_t addr= base+(uint64_t)offset;
+    uint64_t tcr = env->tcr; 
+    uint64_t value=0;
     CCKey mkey=env->mkey;
     //intra-domain access
     if (!is_cross_domain(env, PT)){
-       return;   
+        value = cpu_ldq_data(env, addr);
+        env->xregs[r_idx] = value;
+        return;   
     }//cross-domain access
     else{    
        //check permissions and bounds
@@ -2245,7 +2255,14 @@ void HELPER(cldg)(CPUARMState *env, uint64_t perms_base, uint32_t offset, uint32
                             exception_target_el(env), GETPC());
             return;
         }
+        value = cpu_ldq_data(env, addr);
+        env->xregs[r_idx] = value;
     }
+    return;
+}
+
+void HELPER(cldc)(CPUARMState *env, uint64_t r_idx, uint64_t perms_base, uint32_t offset, uint32_t size, uint64_t PT, uint64_t MAC)
+{
     return;
 }
 //endif

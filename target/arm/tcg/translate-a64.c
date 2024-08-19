@@ -1613,7 +1613,7 @@ static bool trans_UPDCKEYS(DisasContext *s, arg_UPDCKEYS *a)
         tcg_gen_mov_i64(cpu_ekey_lo, cpu_X[a->rs1]);
         tcg_gen_mov_i64(cpu_ekey_hi, cpu_X[a->rs2]);
     }
-     
+
     return true;
 }
 static bool trans_LDC(DisasContext *s, arg_LDC *a)
@@ -1694,79 +1694,47 @@ static bool trans_STC(DisasContext *s, arg_STC *a)
 
 static bool trans_CLDG(DisasContext *s, arg_CLDG *a)
 {
-    TCGv_i64 addr = tcg_temp_new_i64();
-    TCGv_i64 value = tcg_temp_new_i64();
-
+    TCGv_i64 r_idx = tcg_temp_new_i64();
+    tcg_gen_movi_i64(r_idx, a->r);
+   
     TCGv_i64 perms_base = tcg_temp_new_i64();
-    TCGv_i64 perms = tcg_temp_new_i64();
-    TCGv_i64 base = tcg_temp_new_i64();
     TCGv_i32 offset = tcg_temp_new_i32();
     TCGv_i32 size = tcg_temp_new_i32();
     TCGv_i64 PT = tcg_temp_new_i64();
     TCGv_i64 MAC = tcg_temp_new_i64();
 
-    tcg_gen_andi_i64(perms, cpu_CC[a->cr].perms_base, 0xFFFF000000000000);
-    tcg_gen_shri_i64(perms, cpu_CC[a->cr].perms_base, 48);
-    tcg_gen_andi_i64(base, cpu_CC[a->cr].perms_base, 0x0000FFFFFFFFFFFF);
-    
     tcg_gen_mov_i64(perms_base, cpu_CC[a->cr].perms_base);
     tcg_gen_mov_i32(offset, cpu_CC[a->cr].offset);
     tcg_gen_mov_i32(size, cpu_CC[a->cr].size);
     tcg_gen_mov_i64(PT, cpu_CC[a->cr].PT);
     tcg_gen_mov_i64(MAC, cpu_CC[a->cr].MAC);
     
-    //calculate address
-    TCGv_i64 offset64 = tcg_temp_new_i64();
-    tcg_gen_ext_i32_i64(offset64, offset);
-    tcg_gen_add_i64(addr, base, offset64);
-
     //MAC, bounds, permission checks
-    gen_helper_cldg(tcg_env, perms_base, offset, size, PT, MAC);
-
-    //load to 64-bit x register  
-    tcg_gen_qemu_ld_i64(value, addr, get_mem_index(s), MO_64);
-    tcg_gen_st_i64(value, tcg_env, offsetof(CPUARMState, xregs[a->r]));
-    
+    gen_helper_cldg(tcg_env, r_idx, perms_base, offset, size, PT, MAC);
+ 
     return true;
 }
 
 static bool trans_CSTG(DisasContext *s, arg_CSTG *a)
 {
-    TCGv_i64 addr = tcg_temp_new_i64();
-    TCGv_i64 value = tcg_temp_new_i64();
-
+    TCGv_i64 r_idx = tcg_temp_new_i64();
+    tcg_gen_movi_i64(r_idx, a->r);
+   
     TCGv_i64 perms_base = tcg_temp_new_i64();
-    TCGv_i64 perms = tcg_temp_new_i64();
-    TCGv_i64 base = tcg_temp_new_i64();
     TCGv_i32 offset = tcg_temp_new_i32();
     TCGv_i32 size = tcg_temp_new_i32();
     TCGv_i64 PT = tcg_temp_new_i64();
     TCGv_i64 MAC = tcg_temp_new_i64();
 
-    TCGv_i64 tmp = tcg_temp_new_i64();
-
-    tcg_gen_andi_i64(perms, cpu_CC[a->cr].perms_base, 0xFFFF000000000000);
-    tcg_gen_shri_i64(perms, cpu_CC[a->cr].perms_base, 48);
-    tcg_gen_andi_i64(base, cpu_CC[a->cr].perms_base, 0x0000FFFFFFFFFFFF);
-    
     tcg_gen_mov_i64(perms_base, cpu_CC[a->cr].perms_base);
     tcg_gen_mov_i32(offset, cpu_CC[a->cr].offset);
     tcg_gen_mov_i32(size, cpu_CC[a->cr].size);
     tcg_gen_mov_i64(PT, cpu_CC[a->cr].PT);
     tcg_gen_mov_i64(MAC, cpu_CC[a->cr].MAC);
 
-    //calculate address
-    TCGv_i64 offset64 = tcg_temp_new_i64();
-    tcg_gen_ext_i32_i64(offset64, offset);
-    tcg_gen_add_i64(addr, base, offset64);
-    
     //MAC, bounds, permission checks 
-    gen_helper_cstg(tcg_env, perms_base, offset, size, PT, MAC);
+    gen_helper_cstg(tcg_env, r_idx, perms_base, offset, size, PT, MAC);
 
-    //store from 64-bit x register  
-    tcg_gen_ld_i64(value, tcg_env, offsetof(CPUARMState, xregs[a->r]));
-    tcg_gen_qemu_st_i64(value, addr, get_mem_index(s), MO_64);
-   
     return true;
 }
 
