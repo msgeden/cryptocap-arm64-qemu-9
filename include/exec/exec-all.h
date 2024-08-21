@@ -456,7 +456,11 @@ int probe_access_full(CPUArchState *env, vaddr addr, int size,
 int probe_access_full_mmu(CPUArchState *env, vaddr addr, int size,
                           MMUAccessType access_type, int mmu_idx,
                           void **phost, CPUTLBEntryFull **pfull);
-
+//#ifdef TARGET_CRYTPO_CAP
+int probe_access_full_mmu_cc(CPUArchState *env, vaddr addr, int size,
+                          MMUAccessType access_type, int mmu_idx,
+                          void **phost, CPUTLBEntryFull **pfull);
+//#endif
 #endif
 
 static inline tb_page_addr_t tb_page_addr0(const TranslationBlock *tb)

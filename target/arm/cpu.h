@@ -253,6 +253,7 @@ typedef struct CPUArchState {
     bool cross_domain_access;
     //secondary PT base register for a separate walk to be triggered by domain-crossing crypto capabilities
     uint64_t ttbr0_ns_cc;
+    //uint64_t ttbr1_ns_cc;
 //#endif
 
     /* PSTATE isn't an architectural register for ARMv8. However, it is

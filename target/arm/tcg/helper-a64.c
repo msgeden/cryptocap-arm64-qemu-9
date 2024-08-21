@@ -2138,9 +2138,28 @@ static bool is_cross_domain(CPUARMState *env, uint64_t PT){
     // TTBR0: base register 0 (typically user space)
     // TTBR1: base register 1 (@should be for kernel space) we're using TTBR0_EL1, adjust if needed
     uint64_t ttbr = env->cp15.ttbr0_ns;  // ns for non-secure mode s for secure mod we're using TTBR0_EL1, adjust if needed
+    //uint64_t ttbr1 = env->cp15.ttbr1_ns;  // ns for non-secure mode s for secure mod we're using TTBR0_EL1, adjust if needed
     //TODO: PT base register
     //return (ttbr != PT);
+    //if (PT!=0 && ttbr != 0 && ttbr!=PT)
+    //    return true;
+    //else
+    //    return false;
     return (PT != 0);
+}
+
+static bool is_host_domain(CPUARMState *env, uint64_t PT){
+    // ns: non-secure mode, s: secure mode
+    // TTBR0: base register 0 (typically user space)
+    // TTBR1: base register 1 (@should be for kernel space) we're using TTBR0_EL1, adjust if needed
+    uint64_t ttbr = env->cp15.ttbr0_ns;  // ns for non-secure mode s for secure mod we're using TTBR0_EL1, adjust if needed
+    //uint64_t ttbr1 = env->cp15.ttbr1_ns;  // ns for non-secure mode s for secure mod we're using TTBR0_EL1, adjust if needed
+    //TODO: PT base register
+    //return (ttbr != PT);
+    if (PT == 0 || (PT!=0 && ttbr != 0 && ttbr==PT))
+        return true;
+    else
+        return false;
 }
 
 void HELPER(updtcr)(CPUARMState *env)
@@ -2180,8 +2199,7 @@ void HELPER(csign)(CPUARMState *env, uint64_t crs_idx, uint64_t perms_base, uint
     uint64_t MACval=0;
     //assuming TCR is updated for the call and resigning a capability
     //TODO:
-    //if (is_cross_domain(env, PT)){
-    if (is_cross_domain(env, MAC)){
+    if (!is_host_domain(env, PT)){
         if (is_MAC_violation(ptcr, perms_base, size, PT, MAC, mkey)){
             int syn = syn_data_abort_no_iss(arm_current_el(env) != 0, 0, 0, 0, 0, 1, 0x11);
             raise_exception_ra(env, EXCP_DATA_ABORT, syn,
@@ -2224,7 +2242,12 @@ void HELPER(cstg)(CPUARMState *env, uint64_t r_idx, uint64_t perms_base, uint32_
                             exception_target_el(env), GETPC());
             
         }
-        cpu_stq_data(env, addr, value); 
+
+        env->cross_domain_access=true;
+        env->ttbr0_ns_cc=PT;
+        cpu_stq_data(env, addr, value);
+        env->cross_domain_access=false;
+
         return; 
     
     }
@@ -2255,7 +2278,9 @@ void HELPER(cldg)(CPUARMState *env, uint64_t r_idx, uint64_t perms_base, uint32_
                             exception_target_el(env), GETPC());
             return;
         }
+        //env->cross_domain_access=true;
         value = cpu_ldq_data(env, addr);
+        //env->cross_domain_access=false;
         env->xregs[r_idx] = value;
     }
     return;

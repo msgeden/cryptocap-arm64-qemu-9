@@ -17,6 +17,7 @@
         "host-utils.h": "c",
         "streambuf": "cpp"
     },
-    "qemu.test_file":"test_ccall_cret",
-    "home":"${env:HOME}",
+    "qemu.test_file":"test_cross_access",
+    "home": "${env:HOME}",
+    "cmake.sourceDirectory": "/home/munden/cryptocap-arm64/qemu-9/build/meson-private/cmake_SDL2",
 }

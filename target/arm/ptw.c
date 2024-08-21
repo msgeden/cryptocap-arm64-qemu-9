@@ -192,17 +192,27 @@ static bool regime_translation_big_endian(CPUARMState *env, ARMMMUIdx mmu_idx)
 /* Return the TTBR associated with this translation regime */
 static uint64_t regime_ttbr(CPUARMState *env, ARMMMUIdx mmu_idx, int ttbrn)
 {
-    if (mmu_idx == ARMMMUIdx_Stage2) {
-        return env->cp15.vttbr_el2;
+//#ifdef TARGET_CRYPTO_CAP
+    if (env->cross_domain_access){
+        //env->cross_domain_access = false;
+        return env->ttbr0_ns_cc;
     }
-    if (mmu_idx == ARMMMUIdx_Stage2_S) {
-        return env->cp15.vsttbr_el2;
+    else{
+//#endif
+        if (mmu_idx == ARMMMUIdx_Stage2) {
+            return env->cp15.vttbr_el2;
+        }
+        if (mmu_idx == ARMMMUIdx_Stage2_S) {
+            return env->cp15.vsttbr_el2;
+        }
+        if (ttbrn == 0) {
+            return env->cp15.ttbr0_el[regime_el(env, mmu_idx)];
+        } else {
+            return env->cp15.ttbr1_el[regime_el(env, mmu_idx)];
+        }
+//#ifdef TARGET_CRYPTO_CAP
     }
-    if (ttbrn == 0) {
-        return env->cp15.ttbr0_el[regime_el(env, mmu_idx)];
-    } else {
-        return env->cp15.ttbr1_el[regime_el(env, mmu_idx)];
-    }
+//#endif
 }
 
 /* Return true if the specified stage of address translation is disabled */
@@ -579,9 +589,19 @@ static bool S1_ptw_translate(CPUARMState *env, S1Translate *ptw,
         int flags;
 
         env->tlb_fi = fi;
-        flags = probe_access_full_mmu(env, addr, 0, MMU_DATA_LOAD,
+//#ifdef TARGET_CRYPTO_CAP        
+        if (env->cross_domain_access){
+            //env->cross_domain_access = false;
+            flags = probe_access_full_mmu(env, addr, 0, MMU_DATA_LOAD,
                                       arm_to_core_mmu_idx(s2_mmu_idx),
                                       &ptw->out_host, &full);
+        }
+        else{
+            flags = probe_access_full_mmu(env, addr, 0, MMU_DATA_LOAD,
+                                      arm_to_core_mmu_idx(s2_mmu_idx),
+                                      &ptw->out_host, &full);
+        }
+//#endif
         env->tlb_fi = NULL;
 
         if (unlikely(flags & TLB_INVALID_MASK)) {
