@@ -193,8 +193,11 @@ static bool regime_translation_big_endian(CPUARMState *env, ARMMMUIdx mmu_idx)
 static uint64_t regime_ttbr(CPUARMState *env, ARMMMUIdx mmu_idx, int ttbrn)
 {
 //#ifdef TARGET_CRYPTO_CAP
-    if (env->cross_domain_access){
-        //env->cross_domain_access = false;
+    //if (env->cc_access_flag){
+    if (env->cc_access_ttbr == env->cp15.ttbr0_ns && env->cc_access_pc == env->pc){
+        //env->cc_access_flag = false;
+        env->cc_access_pc=0;
+        env->cc_access_ttbr=0; 
         return env->ttbr0_ns_cc;
     }
     else{
@@ -589,19 +592,9 @@ static bool S1_ptw_translate(CPUARMState *env, S1Translate *ptw,
         int flags;
 
         env->tlb_fi = fi;
-//#ifdef TARGET_CRYPTO_CAP        
-        if (env->cross_domain_access){
-            //env->cross_domain_access = false;
-            flags = probe_access_full_mmu(env, addr, 0, MMU_DATA_LOAD,
+        flags = probe_access_full_mmu(env, addr, 0, MMU_DATA_LOAD,
                                       arm_to_core_mmu_idx(s2_mmu_idx),
                                       &ptw->out_host, &full);
-        }
-        else{
-            flags = probe_access_full_mmu(env, addr, 0, MMU_DATA_LOAD,
-                                      arm_to_core_mmu_idx(s2_mmu_idx),
-                                      &ptw->out_host, &full);
-        }
-//#endif
         env->tlb_fi = NULL;
 
         if (unlikely(flags & TLB_INVALID_MASK)) {

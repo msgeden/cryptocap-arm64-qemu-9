@@ -21,6 +21,10 @@
               "${env:HOME}/cryptocap-arm64/linux-busybox/busybox-1.36.1/initramfs.cpio.gz",
               "-append",
               "console=ttyAMA0",
+              //disable optimisations
+              //"-icount shift=0",
+              //"-icount sleep=off",
+              //"-accel tcg,thread=single",
               //"-d", "in_asm,op,out_asm,cpu,mmu,int,exec", //--"-one-insn-per-tb" is used as "-singlestep" in old versions
               //"-D", "${workspaceFolder}/../logs/qemu-system-aarch64-${config:qemu.test_file}.log",
               //"-kernel", "${workspaceFolder}/../tests/${config:qemu.test_file}",

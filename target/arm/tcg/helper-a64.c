@@ -2225,11 +2225,11 @@ void HELPER(cstg)(CPUARMState *env, uint64_t r_idx, uint64_t perms_base, uint32_
     uint64_t base = (perms_base & 0x0000FFFFFFFFFFFF);  
     uint64_t addr= base+(uint64_t)offset;
     uint64_t tcr = env->tcr; 
-    uint64_t value=env->xregs[r_idx];
+    uint64_t svalue=env->xregs[r_idx];
     CCKey mkey=env->mkey;
     //intra-domain access
     if (!is_cross_domain(env, PT)){
-        cpu_stq_data(env, addr, value); 
+        cpu_stq_data(env, addr, svalue); 
         return;   
     }//cross-domain access
     else{    
@@ -2243,10 +2243,13 @@ void HELPER(cstg)(CPUARMState *env, uint64_t r_idx, uint64_t perms_base, uint32_
             
         }
 
-        env->cross_domain_access=true;
+        //env->cc_access_flag=true;
+        //these values are set to help page walker to identify cross-domain memory accesses 
+        env->cc_access_pc=env->pc;
+        env->cc_access_ttbr=env->cp15.ttbr0_ns;
         env->ttbr0_ns_cc=PT;
-        cpu_stq_data(env, addr, value);
-        env->cross_domain_access=false;
+        cpu_stq_data(env, addr, svalue);
+        //env->cc_access_flag=false;
 
         return; 
     
@@ -2260,12 +2263,12 @@ void HELPER(cldg)(CPUARMState *env, uint64_t r_idx, uint64_t perms_base, uint32_
     uint64_t base = (perms_base & 0x0000FFFFFFFFFFFF);  
     uint64_t addr= base+(uint64_t)offset;
     uint64_t tcr = env->tcr; 
-    uint64_t value=0;
+    uint64_t lvalue=0;
     CCKey mkey=env->mkey;
     //intra-domain access
     if (!is_cross_domain(env, PT)){
-        value = cpu_ldq_data(env, addr);
-        env->xregs[r_idx] = value;
+        lvalue = cpu_ldq_data(env, addr);
+        env->xregs[r_idx] = lvalue;
         return;   
     }//cross-domain access
     else{    
@@ -2278,10 +2281,9 @@ void HELPER(cldg)(CPUARMState *env, uint64_t r_idx, uint64_t perms_base, uint32_
                             exception_target_el(env), GETPC());
             return;
         }
-        //env->cross_domain_access=true;
-        value = cpu_ldq_data(env, addr);
-        //env->cross_domain_access=false;
-        env->xregs[r_idx] = value;
+       
+        lvalue = cpu_ldq_data(env, addr);
+        env->xregs[r_idx] = lvalue;
     }
     return;
 }

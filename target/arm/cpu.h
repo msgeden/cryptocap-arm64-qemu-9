@@ -250,7 +250,10 @@ typedef struct CPUArchState {
     //register for previous temporal identifier 
     uint64_t ptcr;
     //cross-domain access flag for MMU
-    bool cross_domain_access;
+    bool cc_access_flag;
+    //since there is no direct association between page-walk and memory instructions, the pc+TTBR value is used as identifier to perform a page walk based on a cap.PT value
+    uint64_t cc_access_pc;
+    uint64_t cc_access_ttbr;
     //secondary PT base register for a separate walk to be triggered by domain-crossing crypto capabilities
     uint64_t ttbr0_ns_cc;
     //uint64_t ttbr1_ns_cc;
