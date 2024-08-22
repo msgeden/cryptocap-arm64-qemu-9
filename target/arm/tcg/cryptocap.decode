@@ -29,6 +29,7 @@
 &imm_idx_crd_crs imm idx crd crs  
 &crs crs  
 &rs rs  
+&imm_rs imm rs  
 &imm_rs1_rs2 imm rs1 rs2
 &nill   
 
@@ -41,6 +42,7 @@
 @op_imm_idx_r_cr        ... .... ..... imm:8 idx:2 r:5 cr:5 &imm_idx_r_cr
 @op_imm_idx_crd_crs     ... .... ..... imm:8 idx:2 crd:5 crs:5 &imm_idx_crd_crs
 @op_rs                  ... .... ..... ..... ..... ..... rs:5 &rs
+@op_imm_rs              ... .... ..... ..... ..... .... imm:1 rs:5 &imm_rs
 @op_crs                 ... .... ..... ..... ..... ..... crs:5 &crs
 @op_imm_rs1_rs2         ... .... ..... ..... .... imm:1 rs1:5 rs2:5 &imm_rs1_rs2
 @op_nill                ... .... ..... ..... ..... ..... ..... &nill
@@ -55,10 +57,15 @@ CSETSIZE    000 0001 00110 00000 ..... ..... .....  @op_crd_crs_rs
 CSETPERMS   000 0001 00111 00000 ..... ..... .....  @op_crd_crs_rs
 CSETADDR    000 0001 01000 00000 ..... ..... .....  @op_crd_crs_rs
 CSIGN       000 0001 01001 00000 00000 00000 .....  @op_crs
+#this is an illegal instruction just placed for debug purposes at initial stages of development
+CSETPT      000 0001 10100 00000 ..... ..... .....  @op_crd_crs_rs
+
 
 #OTHER INSTRUCTIONS
 READTCR     000 0001 01010 00000 00000 00000 .....  @op_rs
 UPDTCR      000 0001 01011 00000 00000 00000 .....  @op_rs
+READTTBR    000 0001 10011 00000 00000 0000 . .....  @op_imm_rs
+
 #TODO: load/store for PTCR registers for interrupt/context saves
 
 #KEY MANIPULATIONS

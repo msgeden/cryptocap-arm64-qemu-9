@@ -67,6 +67,7 @@ static TCGv_i64 cpu_ekey_hi;
 static TCGv_i64 cpu_tcr;
 static TCGv_i64 cpu_ptcr;
 static TCGv_i64 cpu_ttbr0_ns_cc;
+static TCGv_i64 cpu_ttbr1_ns_cc;
 //#endif
 
 enum a64_shift_type {
@@ -162,7 +163,9 @@ void a64_translate_init(void)
     cpu_ekey_hi = tcg_global_mem_new_i64(tcg_env, offsetof(CPUARMState, ekey.hi), "ekey_hi");
     cpu_tcr = tcg_global_mem_new_i64(tcg_env, offsetof(CPUARMState, tcr), "tcr");
     cpu_ptcr = tcg_global_mem_new_i64(tcg_env, offsetof(CPUARMState, ptcr), "ptcr");
-    cpu_ttbr0_ns_cc = tcg_global_mem_new_i64(tcg_env, offsetof(CPUARMState, ttbr0_ns_cc), "ttbr0_ns_cc");
+    cpu_ttbr0_ns_cc = tcg_global_mem_new_i64(tcg_env, offsetof(CPUARMState, cp15.ttbr0_ns), "ttbr0_ns_cc");
+    cpu_ttbr1_ns_cc = tcg_global_mem_new_i64(tcg_env, offsetof(CPUARMState, cp15.ttbr1_ns), "ttbr1_ns_cc");
+    
     //#end
 
     cpu_exclusive_high = tcg_global_mem_new_i64(tcg_env,
@@ -1546,6 +1549,22 @@ static bool trans_CSETADDR(DisasContext *s, arg_CSETADDR *a)
     return true;
 }
 
+
+static bool trans_CSETPT(DisasContext *s, arg_CSETPT *a)
+{
+
+    //replace PT field
+    tcg_gen_mov_i64(cpu_CC[a->crd].PT, cpu_X[a->rs]);
+
+    // take other fields from CRs 
+    tcg_gen_mov_i64(cpu_CC[a->crd].perms_base, cpu_CC[a->crs].perms_base);
+    tcg_gen_mov_i32(cpu_CC[a->crd].offset, cpu_CC[a->crs].offset);
+    tcg_gen_mov_i32(cpu_CC[a->crd].size, cpu_CC[a->crs].size);
+    tcg_gen_mov_i64(cpu_CC[a->crd].MAC, cpu_CC[a->crs].MAC);
+
+    return true;
+}
+
 static bool trans_CSIGN(DisasContext *s, arg_CSIGN *a)
 {
     TCGv_i64 crs_idx = tcg_temp_new_i64();
@@ -1599,6 +1618,19 @@ static bool trans_UPDCKEYS(DisasContext *s, arg_UPDCKEYS *a)
         tcg_gen_mov_i64(cpu_ekey_hi, cpu_X[a->rs2]);
     }
 
+    return true;
+}
+
+static bool trans_READTTBR(DisasContext *s, arg_READTTBR *a)
+{
+    if (a->imm == 0){//reading TTBR0_EL1
+        tcg_gen_mov_i64(cpu_X[a->rs], cpu_ttbr0_ns_cc);
+        //tcg_gen_mov_i64(cpu_X[a->rs], cpu_ttbr1_ns_cc);
+    }
+    else{ //reading TTBR1_EL1
+        tcg_gen_mov_i64(cpu_X[a->rs], cpu_ttbr1_ns_cc);
+        //tcg_gen_mov_i64(cpu_X[a->rs], cpu_ttbr0_ns_cc);
+    } 
     return true;
 }
 static bool trans_LDC(DisasContext *s, arg_LDC *a)

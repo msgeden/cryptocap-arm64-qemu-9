@@ -1101,7 +1101,7 @@ static void aarch64_cpu_dump_state(CPUState *cs, FILE *f, int flags)
         "\n");
     }
 
-    qemu_fprintf(f, "TCR=%016" PRIx64 " PTCR=%016" PRIx64 " TTBR0_NS_CC=%016" PRIx64 "%s", env->tcr, env->ptcr, env->ttbr0_ns_cc, "\n");  
+    qemu_fprintf(f, "TCR=%016" PRIx64 " PTCR=%016" PRIx64 " TTBR0_NS=%016" PRIx64 " TTBR1_NS=%016" PRIx64 " CC_TTBR=%016" PRIx64  "%s", env->tcr, env->ptcr, env->cp15.ttbr0_el[1], env->cp15.ttbr1_el[1], env->cc_ttbr, "\n");  
     qemu_fprintf(f, "MKEY.lo=%016" PRIx64 ":.hi=%016" PRIx64 " EKEY.lo=%016" PRIx64 ":.hi=%016" PRIx64 "%s", env->mkey.lo, env->mkey.hi, env->ekey.lo, env->ekey.hi, "\n");  
     
 //#endif

@@ -195,10 +195,11 @@ static uint64_t regime_ttbr(CPUARMState *env, ARMMMUIdx mmu_idx, int ttbrn)
 //#ifdef TARGET_CRYPTO_CAP
     //if (env->cc_access_flag){
     if (env->cc_access_ttbr == env->cp15.ttbr0_ns && env->cc_access_pc == env->pc){
+    //if (env->cc_access_ttbr == env->cp15.ttbr1_ns && env->cc_access_pc == env->pc){
         //env->cc_access_flag = false;
         env->cc_access_pc=0;
         env->cc_access_ttbr=0; 
-        return env->ttbr0_ns_cc;
+        return env->cc_ttbr;
     }
     else{
 //#endif

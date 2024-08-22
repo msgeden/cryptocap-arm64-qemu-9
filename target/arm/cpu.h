@@ -255,7 +255,7 @@ typedef struct CPUArchState {
     uint64_t cc_access_pc;
     uint64_t cc_access_ttbr;
     //secondary PT base register for a separate walk to be triggered by domain-crossing crypto capabilities
-    uint64_t ttbr0_ns_cc;
+    uint64_t cc_ttbr;
     //uint64_t ttbr1_ns_cc;
 //#endif
 
