@@ -7,7 +7,6 @@
             "request": "launch",
             "program": "${workspaceFolder}/build/qemu-system-aarch64",
             //"args": ["--version"],
-            //"args": ["-machine virt -cpu cortex-a57 -nographic -kernel ${workspaceFolder}/../tests/${config:qemu.test_file}.elf -S -gdb tcp::1234"],
             "args": [
               "-machine", "virt",
               "-cpu", "cortex-a57",
@@ -18,7 +17,7 @@
               "-kernel",
               "${env:HOME}/cryptocap-arm64/linux-busybox/linux-6.6.46/arch/arm64/boot/Image",
               "-initrd",
-              "${env:HOME}/cryptocap-arm64/linux-busybox/busybox-1.36.1/initramfs.cpio",
+              "${env:HOME}/cryptocap-arm64/linux-busybox/busybox-1.36.1/initramfs.cpio.gz",
               "-append",
               "console=ttyAMA0",
               //disable optimisations
@@ -66,7 +65,7 @@
               "-dtb", "${env:HOME}/cryptocap-arm64/images/raspi/bcm2710-rpi-3-b-plus.dtb",
               "-sd", "${env:HOME}/cryptocap-arm64/images/raspi/disk.img",
               "-kernel", "${env:HOME}/cryptocap-arm64/images/raspi/kernel8.img",
-              "-m", "1G",
+              "-m", "4G",
               "-smp", "4",
               "-serial", "stdio",
               //"-nographic",
@@ -110,7 +109,7 @@
               "-nographic",
               //"-d", "in_asm,op,out_asm,cpu,exec", //--"-one-insn-per-tb" is used as "-singlestep" in old versions
               //"-D", "${workspaceFolder}/../logs/qemu-system-aarch64-${config:qemu.test_file}.log",
-              "-kernel", "${env:HOME}/cryptocap-arm64/tests/${config:qemu.test_file}",
+              "-kernel", "${env:HOME}/cryptocap-arm64/linux-busybox/busybox-1.36.1/rootfs/tests/${config:qemu.test_file}",
             ],
             "stopAtEntry": true,
             "cwd": "${workspaceFolder}",
@@ -140,14 +139,12 @@
             "type": "cppdbg",
             "request": "launch",
             "program": "${workspaceFolder}/build/qemu-aarch64",
-            //"args": ["--version"],
-            //"args": ["-machine virt -cpu cortex-a57 -nographic -kernel ${workspaceFolder}/../tests/${config:qemu.test_file}.elf -S -gdb tcp::1234"],
             "args": [
                 "-one-insn-per-tb", 
                 //"-d", "in_asm,op,out_asm,cpu,fpu,mmu,int,exec", //--"-one-insn-per-tb" is used as "-singlestep" in old versions
                 "-d", "in_asm,op,out_asm,cpu,mmu,int,exec", //--"-one-insn-per-tb" is used as "-singlestep" in old versions
                 "-D", "${env:HOME}/cryptocap-arm64/logs/qemu-user-aarch64-${config:qemu.test_file}.log",
-                "${env:HOME}/cryptocap-arm64/tests/${config:qemu.test_file}"
+                "${env:HOME}/cryptocap-arm64/linux-busybox/busybox-1.36.1/rootfs/tests/${config:qemu.test_file}"
                 //"-S -s" //for gdb to connect
             ],
             "stopAtEntry": true,

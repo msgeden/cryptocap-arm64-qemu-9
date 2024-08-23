@@ -10,7 +10,8 @@
                 "--enable-debug",
                 "--enable-debug-tcg",
                 "--enable-tcg-interpreter",
-                "--enable-trace-backends=simple"
+                "--enable-trace-backends=simple",
+                //"--enable-slirp" //for user-mode networking support 
             ],
             "options": {
                 "cwd": "${workspaceFolder}/build"
@@ -106,9 +107,33 @@
                 "-kernel",
                 "${env:HOME}/cryptocap-arm64/linux-busybox/linux-6.6.46/arch/arm64/boot/Image",
                 "-initrd",
-                "${env:HOME}/cryptocap-arm64/linux-busybox/busybox-1.36.1/initramfs.cpio",
+                "${env:HOME}/cryptocap-arm64/linux-busybox/busybox-1.36.1/initramfs.cpio.gz",
                 "-append",
-                "console=ttyAMA0"
+                "console=ttyAMA0",
+                //"-S -gdb tcp::1234"
+            ],
+            "group": {
+                "kind": "test",
+                "isDefault": true
+            },
+            "problemMatcher": []
+        },
+        {
+            "label": "run QEMU (System) Ubuntu 14.04",
+            "type": "shell",
+            "command": "${workspaceFolder}/build/qemu-system-aarch64",
+            "args": [
+                "-m", "4096",
+                "-cpu", "cortex-a57",
+                "-M", "virt",
+                "-nographic",
+                "-drive", "file=${env:HOME}/cryptocap-arm64/images/trusty-server-cloudimg-arm64-uefi1.img,format=qcow2",
+                "-drive", "file=${env:HOME}/cryptocap-arm64/images/user-data.img,format=raw",
+                //"-netdev", "user,id=mynet0,hostfwd=tcp::2222-:22", //for user-mode networking support
+                //"-device", "virtio-net-pci,netdev=mynet0",
+                "-bios", "/usr/share/qemu-efi-aarch64/QEMU_EFI.fd",
+                "-smp", "4",
+                "-virtfs", "local,path=${env:HOME}/shared_vm,mount_tag=host0,security_model=passthrough,id=host0"
             ],
             "group": {
                 "kind": "test",
