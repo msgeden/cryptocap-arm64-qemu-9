@@ -2197,7 +2197,7 @@ void HELPER(csign)(CPUARMState *env, uint64_t crs_idx, uint64_t perms_base, uint
     //important this should be done before switching PT as the host PT cannot be lost
     CCKey mkey=env->mkey;
     uint64_t tcr = env->tcr;
-    uint64_t ptcr = env->ptcr; 
+    uint64_t ptcr = env->ptcr;   
 
     uint64_t MACval=0;
     //assuming TCR is updated for the call and resigning a capability
