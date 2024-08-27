@@ -1594,6 +1594,8 @@ static bool trans_UPDTCR(DisasContext *s, arg_UPDTCR *a)
 
 static bool trans_READCKEYS(DisasContext *s, arg_READCKEYS *a)
 {
+    //check exception level here
+    gen_helper_updckeys(tcg_env);
     if (a->imm == 0){//MAC key
         tcg_gen_mov_i64(cpu_X[a->rs1], cpu_mkey_lo);
         tcg_gen_mov_i64(cpu_X[a->rs2], cpu_mkey_hi);
@@ -1617,7 +1619,11 @@ static bool trans_UPDCKEYS(DisasContext *s, arg_UPDCKEYS *a)
         tcg_gen_mov_i64(cpu_ekey_lo, cpu_X[a->rs1]);
         tcg_gen_mov_i64(cpu_ekey_hi, cpu_X[a->rs2]);
     }
-
+    //sanitise X registers
+    TCGv_i64 zero = tcg_constant_i64(0);
+    tcg_gen_mov_i64(cpu_X[a->rs1], zero);
+    tcg_gen_mov_i64(cpu_X[a->rs2], zero);
+    
     return true;
 }
 
