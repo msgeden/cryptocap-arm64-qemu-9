@@ -1784,8 +1784,8 @@ static bool trans_CLDC(DisasContext *s, arg_CLDC *a)
     return true;
 }
 
-#define CCALL_HANDLER_ADDR 0x0000FFFF;
-#define CRET_HANDLER_ADDR 0xFFFFFFFF;
+#define CCALL_HANDLER_ADDR 0xffff8000810ba000;
+#define CRET_HANDLER_ADDR 0xffff8000810ba000;
 
 static bool trans_CCALL(DisasContext *s, arg_CCALL *a)
 {
