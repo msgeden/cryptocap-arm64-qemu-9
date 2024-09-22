@@ -1785,32 +1785,93 @@ static bool trans_CLDC(DisasContext *s, arg_CLDC *a)
 }
 
 #define CCALL_HANDLER_ADDR 0xffff8000810ba000;
-#define CRET_HANDLER_ADDR 0xffff8000810ba000;
+#define DCALL_HANDLER_ADDR 0xffff8000810ba100;
+#define CRET_HANDLER_ADDR 0xffff8000810ba080;
+#define DRET_HANDLER_ADDR 0xffff8000810ba10c;
+
+
+// static bool trans_SVC(DisasContext *s, arg_i *a)
+// {
+//     /*
+//      * For SVC, HVC and SMC we advance the single-step state
+//      * machine before taking the exception. This is architecturally
+//      * mandated, to ensure that single-stepping a system call
+//      * instruction works properly.
+//      */
+//     uint32_t syndrome = syn_aa64_svc(a->imm);
+//     if (s->fgt_svc) {
+//         gen_exception_insn_el(s, 0, EXCP_UDEF, syndrome, 2);
+//         return true;
+//     }
+//     gen_ss_advance(s);
+//     gen_exception_insn(s, 4, EXCP_SWI, syndrome);
+//     return true;
+// }
 
 static bool trans_CCALL(DisasContext *s, arg_CCALL *a)
 {
-    //TCGv_i32 mode = tcg_const_i32(1);
-    TCGv_i64 target_id = tcg_temp_new_i64();
-    TCGv_i64 handler = tcg_temp_new_i64();
-    uint64_t ccall_handler_addr = CCALL_HANDLER_ADDR;
-    handler = tcg_constant_i64(ccall_handler_addr);
-    tcg_gen_mov_i64(target_id,  cpu_X[a->rs]);
+    //mov x8, #453: set syscall number
+    TCGv_i64 syscall_id = tcg_constant_i64(453);
+    tcg_gen_mov_i64(cpu_X[7], syscall_id);
 
-    // Switch to kernel mode
-    gen_helper_ccall(tcg_env, handler, target_id);
+    //duplicate of SVC #0 instruction
+    uint32_t syndrome = syn_aa64_svc(0);   
+    if (s->fgt_svc) {
+        gen_exception_insn_el(s, 0, EXCP_UDEF, syndrome, 2);
+        return true;
+    }
+    gen_ss_advance(s);
+    gen_exception_insn(s, 4, EXCP_SWI, syndrome);
+    
 
-    // Jump to ccall_handler
-    //gen_goto_tb(s, 0, handler_addr);
+    // TCGv_i64 ccall_addr = tcg_temp_new_i64();
+    // ccall_addr = tcg_const_i64(DCALL_HANDLER_ADDR); // Example address
+    // tcg_gen_movi_i64(cpu_pc, 0xffff8000810ba100);
+    // tcg_gen_addi_i64(cpu_pc, cpu_pc, 8);
+
+    // //tcg_temp_free(ccall_addr);
+    // gen_exception_insn(s, 0, EXCP_UDEF, syn_uncategorized());
+    // //gen_exception_noreturn(s, EXCP_UDEF, syn_undef_insn(s));
+
+    // // Indicate that we have modified the PC
+    // s->base.is_jmp = DISAS_NORETURN;
+
+    // TCGv_i64 target_id = tcg_temp_new_i64();
+    // TCGv_i64 handler = tcg_temp_new_i64();
+    // uint64_t ccall_handler_addr = DCALL_HANDLER_ADDR;
+    // handler = tcg_constant_i64(ccall_handler_addr);
+    // tcg_gen_mov_i64(target_id,  cpu_X[a->rs]);
+
+    // // Switch to kernel mode
+    // gen_helper_ccall(tcg_env, handler, target_id);
+
+    // // Jump to ccall_handler
+    // gen_goto_tb(s, 0, ccall_handler_addr);
+    
+    // // Set PC to handler address
+    // tcg_gen_movi_i64(cpu_pc, ccall_handler_addr);
+
+    // // Exit the current TB
+    // tcg_gen_exit_tb(tcg_constant_tl(ccall_handler_addr));
 
     return true;
 }
 
 static bool trans_CRET(DisasContext *s, arg_CRET *a)
 {
-    TCGv_i64 handler = tcg_temp_new_i64();
-    uint64_t cret_handler_addr = CRET_HANDLER_ADDR;
-    handler = tcg_constant_i64(cret_handler_addr);
-    gen_helper_cret(tcg_env, handler);
+     //mov x8, #454: set syscall number
+    TCGv_i64 syscall_id = tcg_constant_i64(454);
+    tcg_gen_mov_i64(cpu_X[7], syscall_id);
+
+    //duplicate of SVC #0 instruction
+    uint32_t syndrome = syn_aa64_svc(0);   
+    if (s->fgt_svc) {
+        gen_exception_insn_el(s, 0, EXCP_UDEF, syndrome, 2);
+        return true;
+    }
+    gen_ss_advance(s);
+    gen_exception_insn(s, 4, EXCP_SWI, syndrome);
+    
     return true;
 }
 //#endif 
