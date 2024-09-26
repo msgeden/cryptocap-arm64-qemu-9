@@ -15,7 +15,9 @@
         "string_view": "c",
         "initializer_list": "c",
         "host-utils.h": "c",
-        "streambuf": "cpp"
+        "streambuf": "cpp",
+        "tcg-internal.h": "c",
+        "semihost.h": "c"
     },
     "qemu.test_file":"test_ccall_cret",
     "home": "${env:HOME}",

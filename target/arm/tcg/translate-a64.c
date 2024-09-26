@@ -1784,96 +1784,65 @@ static bool trans_CLDC(DisasContext *s, arg_CLDC *a)
     return true;
 }
 
-#define CCALL_HANDLER_ADDR 0xffff8000810ba000;
-#define DCALL_HANDLER_ADDR 0xffff8000810ba100;
+#define CCALL_HANDLER_ADDR 0xffff800081102000;
 #define CRET_HANDLER_ADDR 0xffff8000810ba080;
-#define DRET_HANDLER_ADDR 0xffff8000810ba10c;
-
-
-// static bool trans_SVC(DisasContext *s, arg_i *a)
-// {
-//     /*
-//      * For SVC, HVC and SMC we advance the single-step state
-//      * machine before taking the exception. This is architecturally
-//      * mandated, to ensure that single-stepping a system call
-//      * instruction works properly.
-//      */
-//     uint32_t syndrome = syn_aa64_svc(a->imm);
-//     if (s->fgt_svc) {
-//         gen_exception_insn_el(s, 0, EXCP_UDEF, syndrome, 2);
-//         return true;
-//     }
-//     gen_ss_advance(s);
-//     gen_exception_insn(s, 4, EXCP_SWI, syndrome);
-//     return true;
-// }
-
 static bool trans_CCALL(DisasContext *s, arg_CCALL *a)
 {
-    //mov x8, #453: set syscall number
-    TCGv_i64 syscall_id = tcg_constant_i64(453);
-    tcg_gen_mov_i64(cpu_X[7], syscall_id);
 
-    //duplicate of SVC #0 instruction
-    uint32_t syndrome = syn_aa64_svc(0);   
-    if (s->fgt_svc) {
-        gen_exception_insn_el(s, 0, EXCP_UDEF, syndrome, 2);
-        return true;
-    }
+    uint32_t syndrome = 0;
     gen_ss_advance(s);
-    gen_exception_insn(s, 4, EXCP_SWI, syndrome);
-    
-
-    // TCGv_i64 ccall_addr = tcg_temp_new_i64();
-    // ccall_addr = tcg_const_i64(DCALL_HANDLER_ADDR); // Example address
-    // tcg_gen_movi_i64(cpu_pc, 0xffff8000810ba100);
-    // tcg_gen_addi_i64(cpu_pc, cpu_pc, 8);
-
-    // //tcg_temp_free(ccall_addr);
-    // gen_exception_insn(s, 0, EXCP_UDEF, syn_uncategorized());
-    // //gen_exception_noreturn(s, EXCP_UDEF, syn_undef_insn(s));
-
-    // // Indicate that we have modified the PC
-    // s->base.is_jmp = DISAS_NORETURN;
-
-    // TCGv_i64 target_id = tcg_temp_new_i64();
-    // TCGv_i64 handler = tcg_temp_new_i64();
-    // uint64_t ccall_handler_addr = DCALL_HANDLER_ADDR;
-    // handler = tcg_constant_i64(ccall_handler_addr);
-    // tcg_gen_mov_i64(target_id,  cpu_X[a->rs]);
-
-    // // Switch to kernel mode
-    // gen_helper_ccall(tcg_env, handler, target_id);
-
-    // // Jump to ccall_handler
-    // gen_goto_tb(s, 0, ccall_handler_addr);
-    
-    // // Set PC to handler address
-    // tcg_gen_movi_i64(cpu_pc, ccall_handler_addr);
-
-    // // Exit the current TB
-    // tcg_gen_exit_tb(tcg_constant_tl(ccall_handler_addr));
-
+    gen_exception_insn(s, 4, EXCP_CCALL, syndrome);
     return true;
 }
 
 static bool trans_CRET(DisasContext *s, arg_CRET *a)
 {
-     //mov x8, #454: set syscall number
-    TCGv_i64 syscall_id = tcg_constant_i64(454);
-    tcg_gen_mov_i64(cpu_X[7], syscall_id);
+    //  //mov x8, #454: set syscall number
+    // TCGv_i64 syscall_id = tcg_constant_i64(454);
+    // tcg_gen_mov_i64(cpu_X[7], syscall_id);
 
-    //duplicate of SVC #0 instruction
-    uint32_t syndrome = syn_aa64_svc(0);   
-    if (s->fgt_svc) {
-        gen_exception_insn_el(s, 0, EXCP_UDEF, syndrome, 2);
-        return true;
-    }
-    gen_ss_advance(s);
-    gen_exception_insn(s, 4, EXCP_SWI, syndrome);
-    
+    // //duplicate of SVC #0 instruction
+    // uint32_t syndrome = syn_aa64_svc(0);   
+    // if (s->fgt_svc) {
+    //     gen_exception_insn_el(s, 0, EXCP_UDEF, syndrome, 2);
+    //     return true;
+    // }
+    // gen_ss_advance(s);
+    // gen_exception_insn(s, 4, EXCP_SWI, syndrome);
     return true;
 }
+
+// #define DCALL_HANDLER_ADDR 0xffff8000810ba100;
+// #define DRET_HANDLER_ADDR 0xffff8000810ba10c;
+// static bool trans_DCALL(DisasContext *s, arg_DCALL *a)
+// {
+//     TCGv_i64 handler = tcg_temp_new_i64();
+//     uint64_t dcall_handler_addr = DCALL_HANDLER_ADDR;
+//     handler = tcg_constant_i64(dcall_handler_addr);
+
+//     // Generate TCG code to call the helper function
+//     gen_helper_dcall(tcg_env, dcall_handler_addr);
+
+//     return true;
+// }
+
+// static bool trans_DRET(DisasContext *s, arg_DRET *a)
+// {
+//     TCGv_i64 handler = tcg_temp_new_i64();
+//     uint64_t dret_handler_addr = DRET_HANDLER_ADDR;
+//     handler = tcg_constant_i64(dret_handler_addr);
+    
+//     // Switch to kernel mode
+//     gen_helper_dret(tcg_env, dret_handler_addr);
+
+//     return true;
+// }
+
+// static bool trans_DEXIT(DisasContext *s, arg_DEXIT *a)
+// {
+//     // Switch to user mode
+//     return true;
+// }
 //#endif 
 
 /*
@@ -5201,93 +5170,6 @@ static void disas_logic_reg(DisasContext *s, uint32_t insn)
     }
 }
 
-// #ifdef TARGET_CRYPTO_CAP
-// /*
-//  * Add and multiply by power-of-two immediate
-//     31 30 28  25     20   15    10     5     0
-//      +----+----+-----+-----+-----+-----+-----+
-//      |....|0001|00101| imm |  Rm |  Rn |  Rd |
-//      +----+----+-----+-----+-----+-----+-----+
-//      0000 0001 00101 00011 00001 00010 00011
-// --------+-----+--+-------+---------+------+------+
-//  */
-// static void disas_add_mult(DisasContext *s, uint32_t insn)
-// {
-//     int rd = extract32(insn, 0, 5);
-//     int rn = extract32(insn, 5, 5);
-//     int rm = extract32(insn, 10, 5);
-//     int imm5 = extract32(insn, 15, 5);
-        
-//     if (rd == 31 || rn == 31 || rm == 31) {
-//         unallocated_encoding(s);
-//         return;
-//     }
-
-//     TCGv_i64 tcg_rd, tcg_rn, tcg_rm, tcg_tmp1, tcg_tmp2;
-    
-//     tcg_rd = cpu_reg(s, rd);
-//     tcg_rm = cpu_reg(s, rn);
-//     tcg_rn = cpu_reg(s, rm);
-//     tcg_tmp1 = tcg_temp_new_i64();
-//     tcg_tmp2 = tcg_temp_new_i64();
-    
-//     tcg_gen_add_i64(tcg_tmp1, tcg_rm, tcg_rn);
-//     tcg_gen_shri_i64(tcg_tmp2, tcg_tmp1, imm5);
-//     tcg_gen_mov_i64(tcg_rd, tcg_tmp2);
-// }
-// /*
-//  * Add and multiply by power-of-two immediate
-//     31 30 28  25     20   15    10     5     0
-//      +----+----+-----+-----+-----+-----+-----+
-//      |....|0001|00110| imm |  Rm |  Rn |  Rd |
-//      +----+----+-----+-----+-----+-----+-----+
-//      0000 0001 00110 00011 00001 00010 00011
-// --------+-----+--+-------+---------+------+------+
-//  */
-// static void disas_add_div(DisasContext *s, uint32_t insn)
-// {
-//     int rd = extract32(insn, 0, 5);
-//     int rn = extract32(insn, 5, 5);
-//     int rm = extract32(insn, 10, 5);
-//     int imm5 = extract32(insn, 15, 5);
-   
-//     if (rd == 31 || rn == 31 || rm == 31) {
-//         unallocated_encoding(s);
-//         return;
-//     }
-    
-//     TCGv_i64 tcg_rd, tcg_rn, tcg_rm, tcg_tmp1, tcg_tmp2;
-    
-//     tcg_rd = cpu_reg(s, rd);
-//     tcg_rm = cpu_reg(s, rn);
-//     tcg_rn = cpu_reg(s, rm);
-//     tcg_tmp1 = tcg_temp_new_i64();
-//     tcg_tmp2 = tcg_temp_new_i64();
-    
-//     tcg_gen_add_i64(tcg_tmp1, tcg_rm, tcg_rn);
-//     tcg_gen_shli_i64(tcg_tmp2, tcg_tmp1, imm5);
-//     tcg_gen_mov_i64(tcg_rd, tcg_tmp2);
-// }
-
-// // static void trans_set_ccreg_base(DisasContext *s, uint32_t insn)
-// // {
-// //     int reg = (insn >> 0) & 0x1f;  // Source register
-// //     TCGv_i64 t0 = tcg_tempendif_new_i64();
-// //     tcg_gen_mov_i64(t0, cpu_gpr[reg]);
-// //     tcg_gen_st_i64(t0, cpu_env, offsetof(CPUARMState, crypto_cap.base_offset));
-// //     tcg_temp_free_i64(t0);
-// // }
-
-// // static void trans_get_ccreg_base(DisasContext *s, uint32_t insn)
-// // {
-// //     int reg = (insn >> 0) & 0x1f;  // Destination register
-// //     TCGv_i64 t0 = tcg_temp_new_i64();
-// //     tcg_gen_ld_i64(t0, cpu_env, offsetof(CPUARMState, crypto_cap.base_offset));
-// //     tcg_gen_mov_i64(cpu_gpr[reg], t0);
-// //     tcg_temp_free_i64(t0);
-// // }
-
-// #endif
 /*
  * Add/subtract (extended register)
  *
@@ -14659,16 +14541,6 @@ static void disas_a64_legacy(DisasContext *s, uint32_t insn)
     case 0xf:      /* Data processing - SIMD and floating point */
         disas_data_proc_simd_fp(s, insn);
         break;
-// #ifdef TARGET_CRYPTO_CAP
-//     case 0x1: //25-29
-//         switch (extract32(insn, 20, 5))
-//         case 0x5:  //20-25
-//             disas_add_mult(s, insn);
-//             break;
-//         case 0x6:  //20-25
-//             disas_add_div(s, insn);
-//             break;
-// #endif
     default:
         unallocated_encoding(s);
         break;

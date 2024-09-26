@@ -1856,7 +1856,7 @@ void HELPER(cpyfe)(CPUARMState *env, uint32_t syndrome, uint32_t wdesc,
     do_cpye(env, syndrome, wdesc, rdesc, false, GETPC());
 }
 
-//ifdef TARGET_CRYPTO_CAP
+//#ifdef TARGET_CRYPTO_CAP
 typedef enum capPermFlags {
     READ = 1,
     WRITE = 2,
@@ -2382,46 +2382,85 @@ void HELPER(cldc)(CPUARMState *env, uint64_t crd_idx, uint64_t perms_base, uint3
     return;
 }
 
-void HELPER(ccall)(CPUARMState *env, uint64_t handler, uint64_t rs)
+#define CCALL_HANDLER_ADDR 0xffff800081102000;
+void HELPER(ccall)(CPUARMState *env)
 {
-    // Switch to EL1 mode
-    //env->pstate = PSTATE_MODE_EL1h;
+    // // Ensure we're currently in EL0
+    // int cur_el = arm_current_el(env);
+    // if (cur_el != 0) {
+    //     // Handle error: ccall should only be called from EL0
+    //     return;
+    // }
+    // // Switch to EL1h mode
+    // env->pstate = aarch64_pstate_mode(1, true); // EL1h mode with SP_EL1
+    // cur_el = arm_current_el(env);
 
-    //env->pstate = (env->pstate & ~PSTATE_EL_MASK) | PSTATE_EL1;
-    //unsigned int target_el=1;
-    int current_el = arm_current_el(env);
-    env->pstate = aarch64_pstate_mode(1, true);
-    current_el = arm_current_el(env);
+    // // Save the current PSTATE to SPSR_EL1
 
-    // Additional EL1 setup if needed
+    // unsigned int spsr_idx = aarch64_banked_spsr_index(cur_el);
+    // uint32_t spsr = env->banked_spsr[spsr_idx];
+    
 
-    // For example, you might want to update other CPU state registers
-    // Setting up system registers specific to EL1, such as SCTLR_EL1 (System Control Register for EL1).
-    // Configuring memory management registers like TTBR0_EL1 and TTBR1_EL1 (Translation Table Base Registers).
-    // Setting up exception handling registers like VBAR_EL1 (Vector Base Address Register).
-    // Configuring timer registers specific to EL1, such as CNTKCTL_EL1.
-    // Adjusting the Stack Pointer for EL1 (SP_EL1).
-    // Setting up any necessary virtual memory mappings for EL1.
-    // Configuring interrupt routing and masking appropriate for EL1.
-    //These setups would involve writing to the respective system registers and updating the CPU state accordingly. The exact implementation would depend on the specific requirements of your system and the ARM architecture version you're working with.
+    // // Save the current SP (SP_EL0)
+    // uint64_t sp_el0 = env->xregs[31]; // In QEMU, SP is in regs[31]
 
-    // The 'rs' parameter can be used if you need to pass any additional information
+    // // Set up SP_EL1 to point to a valid kernel stack
+    // // For simplicity, let's assume we have a predefined kernel stack
+    // uint64_t kernel_stack_base = 0xffff800080800000; // Example kernel stack base
+    // uint64_t kernel_stack_size = 0x8000; // Example stack size (32KB)
+    // env->sp_el[1] = kernel_stack_base + kernel_stack_size; // Stack grows downward
+    // // Update the current SP to SP_EL1
+    // env->xregs[31] = env->sp_el[1];
 
-    // Ensure the CPU recognizes the mode change
-    arm_rebuild_hflags(env);
+    // // Save the return address (next instruction after ccall)
+    // env->elr_el[1] = env->pc + 4;
+
+    // // Save the current PSTATE to SPSR_EL1
+    // env->spsr = aarch64_cpu_get_pstate(env,true);
+    
+    // // Set the PC to the handler address
+    // env->pc = (target_ulong)CCALL_HANDLER_ADDR;
     return;
 }
 
 
 void HELPER(cret)(CPUARMState *env, uint64_t handler)
 {
-    int current_el = arm_current_el(env);
-    //env->pstate = aarch64_pstate_mode(1, true);
-    env->pstate = PSTATE_MODE_EL1h;
-    current_el = arm_current_el(env);
-
-    arm_rebuild_hflags(env);
-
-    return;
+    // int current_el = arm_current_el(env);
+    // env->pstate = aarch64_pstate_mode(0, true);
+    // current_el = arm_current_el(env);
+    // env->pc = (target_ulong)DRET_HANDLER_ADDR;
+    // return;
 }
-//endif
+
+
+// void HELPER(dcall)(CPUARMState *env, uint64_t handler, uint64_t rs)
+// {
+//     int current_el = arm_current_el(env);
+//     env->pstate = aarch64_pstate_mode(1, true);
+//     current_el = arm_current_el(env);
+//     arm_rebuild_hflags(env);
+//     return; 
+// }
+
+
+// void HELPER(dret)(CPUARMState *env, uint64_t handler)
+// {
+//     int current_el = arm_current_el(env);
+//     env->pstate = aarch64_pstate_mode(1, true);
+//     current_el = arm_current_el(env);
+//     arm_rebuild_hflags(env);
+//     return; 
+// }
+
+// void HELPER(dexit)(CPUARMState *env)
+// {
+//     int current_el = arm_current_el(env);
+//     env->pstate = aarch64_pstate_mode(1, true);
+//     //env->pstate = PSTATE_MODE_EL0t;
+//     current_el = arm_current_el(env);
+//     arm_rebuild_hflags(env);
+//     return;
+// }
+
+//#endif

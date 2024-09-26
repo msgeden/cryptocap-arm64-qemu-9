@@ -10758,6 +10758,8 @@ void arm_log_exception(CPUState *cs)
             [EXCP_DIVBYZERO] = "v7M DIVBYZERO UsageFault",
             [EXCP_VSERR] = "Virtual SERR",
             [EXCP_GPC] = "Granule Protection Check",
+            [EXCP_CCALL] = "Cross Domain Call",
+
         };
 
         if (idx >= 0 && idx < ARRAY_SIZE(excnames)) {
@@ -11116,6 +11118,10 @@ static void arm_cpu_do_interrupt_aarch32_hyp(CPUState *cs)
     case EXCP_HYP_TRAP:
         addr = 0x14;
         break;
+    //#ifdef TARGET_CRYPTO_CAP
+    case EXCP_CCALL:
+        break;
+    //#endif
     default:
         cpu_abort(cs, "Unhandled exception 0x%x\n", cs->exception_index);
     }
@@ -11324,6 +11330,8 @@ static void arm_cpu_do_interrupt_aarch32(CPUState *cs)
         mask = CPSR_A | CPSR_I | CPSR_F;
         offset = 0;
         break;
+     case EXCP_CCALL:
+        break;
     default:
         cpu_abort(cs, "Unhandled exception 0x%x\n", cs->exception_index);
         return; /* Never happens.  Keep compiler happy.  */
@@ -11451,6 +11459,8 @@ static bool syndrome_is_sync_extabt(uint32_t syndrome)
     }
 }
 
+#define CCALL_HANDLER_ADDR 0xffff800081102000;
+
 /* Handle exception entry to a target EL which is using AArch64 */
 static void arm_cpu_do_interrupt_aarch64(CPUState *cs)
 {
@@ -11462,7 +11472,7 @@ static void arm_cpu_do_interrupt_aarch64(CPUState *cs)
     unsigned int old_mode;
     unsigned int cur_el = arm_current_el(env);
     int rt;
-
+    
     if (tcg_enabled()) {
         /*
          * Note that new_el can never be 0.  If cur_el is 0, then
@@ -11528,6 +11538,7 @@ static void arm_cpu_do_interrupt_aarch64(CPUState *cs)
     case EXCP_BKPT:
     case EXCP_UDEF:
     case EXCP_SWI:
+    case EXCP_CCALL:
     case EXCP_HVC:
     case EXCP_HYP_TRAP:
     case EXCP_SMC:
@@ -11585,7 +11596,7 @@ static void arm_cpu_do_interrupt_aarch64(CPUState *cs)
         env->exception.syndrome = syn_serror(env->cp15.vsesr_el2 & 0x1ffffff);
         env->cp15.esr_el[new_el] = env->exception.syndrome;
         break;
-    default:
+     default:
         cpu_abort(cs, "Unhandled exception 0x%x\n", cs->exception_index);
     }
 
@@ -11661,8 +11672,13 @@ static void arm_cpu_do_interrupt_aarch64(CPUState *cs)
         helper_rebuild_hflags_a64(env, new_el);
     }
 
-    env->pc = addr;
-
+    if (cs->exception_index == EXCP_CCALL){ 
+        env->pc = (uint64_t)CCALL_HANDLER_ADDR;
+    }
+    else{
+        env->pc = addr;
+    }
+    
     qemu_log_mask(CPU_LOG_INT, "...to EL%d PC 0x%" PRIx64 " PSTATE 0x%x\n",
                   new_el, env->pc, pstate_read(env));
 }

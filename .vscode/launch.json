@@ -1,6 +1,47 @@
 {
     "version": "0.2.0",
+    
     "configurations": [
+        {
+            "name": "(gdb) Debug linux + busybox system-aarch64",
+            "type": "cppdbg",
+            "request": "launch",
+            "program": "${workspaceFolder}/build/qemu-system-aarch64",
+            //"args": ["--version"],
+            "args": [
+              "-machine", "virt",
+              "-cpu", "cortex-a57",
+              "-smp", "1",
+              "-m", "2G",
+              "-nographic",
+              "-kernel", "${env:HOME}/cryptocap-arm64/linux-busybox/linux-6.10/arch/arm64/boot/Image",
+              "-initrd", "${env:HOME}/cryptocap-arm64/linux-busybox/busybox-1_36_0/initramfs.cpio.gz",
+              "-append", "console=ttyAMA0 root=/dev/vda nokaslr",
+              "-gdb", "tcp::1234",
+              "-S"],
+            "stopAtEntry": true,
+            "cwd": "${workspaceFolder}",
+            "environment": [],
+            "externalConsole": false,
+            "MIMode": "gdb",
+            "setupCommands": [
+                {
+                    "description": "Enable pretty-printing for gdb",
+                    "text": "-enable-pretty-printing",
+                    "ignoreFailures": true
+                }
+            ],
+            "miDebuggerPath": "/usr/bin/gdb",  // Ensure this is the correct path to your gdb
+            //"miDebuggerServerAddress": "localhost:1234",
+            //"preLaunchTask": "build QEMU",
+            //"postDebugTask": "run QEMU",
+            //"targetArchitecture": "x86_64",
+            //"debugServerPath": "${workspaceFolder}/build/qemu-system-x86_64",
+            //"debugServerArgs": "-S -s -nographic -machine virt -kernel test",
+            //"serverStarted": "QEMU [0-9]+ host:port: localhost:1234",
+            //"filterStderr": true,
+            //"filterStdout": true
+        },
         {
             "name": "(gdb) Launch linux + busybox system-aarch64",
             "type": "cppdbg",
@@ -21,13 +62,14 @@
               //"${env:HOME}/cryptocap-arm64/linux-busybox/busybox-1.36.1/initramfs.cpio.gz",
               "${env:HOME}/cryptocap-arm64/linux-busybox/busybox-1_36_0/initramfs.cpio.gz",
               "-append",
-              "console=ttyAMA0",
+              "console=ttyAMA0 root=/dev/vda nokaslr",
               //disable optimisations
               //"-icount shift=0",
               //"-icount sleep=off",
               //"-accel tcg,thread=single",
               //"-d", "in_asm,op,out_asm,cpu,mmu,int,exec", //--"-one-insn-per-tb" is used as "-singlestep" in old versions
-              //"-D", "${workspaceFolder}/../logs/qemu-system-aarch64-${config:qemu.test_file}.log",
+              "-d", "int,cpu_reset", //--"-one-insn-per-tb" is used as "-singlestep" in old versions
+              "-D", "${workspaceFolder}/../logs/qemu-system-aarch64-${config:qemu.test_file}.log",
               //"-kernel", "${workspaceFolder}/../tests/${config:qemu.test_file}",
             ],
             "stopAtEntry": true,

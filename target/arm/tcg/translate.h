@@ -320,6 +320,7 @@ static inline int curr_insn_len(DisasContext *s)
 #ifdef TARGET_AARCH64
 void a64_translate_init(void);
 void gen_a64_update_pc(DisasContext *s, target_long diff);
+void gen_a64_update_pc_for_ccall(DisasContext *s, target_long diff);
 extern const TranslatorOps aarch64_translator_ops;
 #else
 static inline void a64_translate_init(void)

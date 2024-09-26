@@ -166,6 +166,10 @@ void cpu_loop(CPUARMState *env)
         case EXCP_ATOMIC:
             cpu_exec_step_atomic(cs);
             break;
+        //#ifdef TARGET_CRYPTO_CAP
+        case EXCP_CCALL:
+            break;
+        //#endif
         default:
             EXCP_DUMP(env, "qemu: unhandled CPU exception 0x%x - aborting\n", trapnr);
             abort();

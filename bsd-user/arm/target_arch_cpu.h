@@ -188,6 +188,10 @@ static inline void target_cpu_loop(CPUARMState *env)
         case EXCP_ATOMIC:
             cpu_exec_step_atomic(cs);
             break;
+        //#ifdef TARGET_CRYPTO_CAP
+        case EXCP_CCALL:
+            break;
+        //#endif
         default:
             fprintf(stderr, "qemu: unhandled CPU exception 0x%x - aborting\n",
                     trapnr);

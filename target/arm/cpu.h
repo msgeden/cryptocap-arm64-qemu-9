@@ -67,6 +67,10 @@
 #define EXCP_DIVBYZERO      23   /* v7M DIVBYZERO UsageFault */
 #define EXCP_VSERR          24
 #define EXCP_GPC            25   /* v9 Granule Protection Check Fault */
+//#ifdef TARGET_CRYPTO_CAP
+#define EXCP_CCALL            26   /* Cross Domain Call (CCALL) */
+//#endif
+
 /* NB: add new EXCP_ defines to the array in arm_log_exception() too */
 
 #define ARMV7M_EXCP_RESET   1
@@ -207,14 +211,7 @@ typedef struct ARMPACKey {
 typedef struct CCKey {
     uint64_t lo, hi;
 } CCKey;
-
 //#endif
-
-// typedef struct capreg {
-//      uint64_t fields[4];
-//      } capreg;
-//#endif
-
 
 /* See the commentary above the TBFLAG field definitions.  */
 typedef struct CPUARMTBFlags {

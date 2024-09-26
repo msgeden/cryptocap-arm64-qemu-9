@@ -2377,6 +2377,10 @@ void arm_v7m_cpu_do_interrupt(CPUState *cs)
          * v7m_preserve_fp_state() helper function.
          */
         break;
+    //#ifdef TARGET_CRYPTO_CAP
+    case EXCP_CCALL:
+        break;
+    //#endif
     default:
         cpu_abort(cs, "Unhandled exception 0x%x\n", cs->exception_index);
         return; /* Never happens.  Keep compiler happy.  */
