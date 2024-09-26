@@ -11538,7 +11538,9 @@ static void arm_cpu_do_interrupt_aarch64(CPUState *cs)
     case EXCP_BKPT:
     case EXCP_UDEF:
     case EXCP_SWI:
+    //#ifdef TARGET_CRYPTO_CAP
     case EXCP_CCALL:
+    //#endif
     case EXCP_HVC:
     case EXCP_HYP_TRAP:
     case EXCP_SMC:
@@ -11671,13 +11673,16 @@ static void arm_cpu_do_interrupt_aarch64(CPUState *cs)
     if (tcg_enabled()) {
         helper_rebuild_hflags_a64(env, new_el);
     }
-
+    //#ifdef TARGET_CRYPTO_CAP
     if (cs->exception_index == EXCP_CCALL){ 
         env->pc = (uint64_t)CCALL_HANDLER_ADDR;
     }
     else{
+    //#endif
+    //#ifdef TARGET_CRYPTO_CAP
         env->pc = addr;
     }
+    //#endif
     
     qemu_log_mask(CPU_LOG_INT, "...to EL%d PC 0x%" PRIx64 " PSTATE 0x%x\n",
                   new_el, env->pc, pstate_read(env));
