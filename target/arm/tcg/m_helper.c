@@ -2380,6 +2380,8 @@ void arm_v7m_cpu_do_interrupt(CPUState *cs)
     //#ifdef TARGET_CRYPTO_CAP
     case EXCP_CCALL:
         break;
+    case EXCP_CRET:
+        break;
     //#endif
     default:
         cpu_abort(cs, "Unhandled exception 0x%x\n", cs->exception_index);

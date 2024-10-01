@@ -1784,66 +1784,53 @@ static bool trans_CLDC(DisasContext *s, arg_CLDC *a)
     return true;
 }
 
-#define CCALL_HANDLER_ADDR 0xffff800081102000;
-#define CRET_HANDLER_ADDR 0xffff8000810ba080;
 static bool trans_CCALL(DisasContext *s, arg_CCALL *a)
 {
 
-    uint32_t syndrome = 0;
+    gen_helper_ccall(tcg_env);
+
+    uint32_t syndrome = syn_aa64_svc(1);
     gen_ss_advance(s);
     gen_exception_insn(s, 4, EXCP_CCALL, syndrome);
+
+    //gen_helper_ccall(tcg_env);
     return true;
 }
 
 static bool trans_CRET(DisasContext *s, arg_CRET *a)
 {
-    //  //mov x8, #454: set syscall number
-    // TCGv_i64 syscall_id = tcg_constant_i64(454);
-    // tcg_gen_mov_i64(cpu_X[7], syscall_id);
+    gen_helper_cret(tcg_env);
 
-    // //duplicate of SVC #0 instruction
-    // uint32_t syndrome = syn_aa64_svc(0);   
-    // if (s->fgt_svc) {
-    //     gen_exception_insn_el(s, 0, EXCP_UDEF, syndrome, 2);
-    //     return true;
-    // }
-    // gen_ss_advance(s);
-    // gen_exception_insn(s, 4, EXCP_SWI, syndrome);
+    uint32_t syndrome = syn_aa64_svc(2);
+    gen_ss_advance(s);
+    gen_exception_insn(s, 4, EXCP_CRET, syndrome);
+
+    //gen_helper_cret(tcg_env);
     return true;
 }
 
-// #define DCALL_HANDLER_ADDR 0xffff8000810ba100;
-// #define DRET_HANDLER_ADDR 0xffff8000810ba10c;
-// static bool trans_DCALL(DisasContext *s, arg_DCALL *a)
-// {
-//     TCGv_i64 handler = tcg_temp_new_i64();
-//     uint64_t dcall_handler_addr = DCALL_HANDLER_ADDR;
-//     handler = tcg_constant_i64(dcall_handler_addr);
+static bool trans_CJMP(DisasContext *s, arg_CJMP *a)
+{
 
-//     // Generate TCG code to call the helper function
-//     gen_helper_dcall(tcg_env, dcall_handler_addr);
-
-//     return true;
-// }
-
-// static bool trans_DRET(DisasContext *s, arg_DRET *a)
-// {
-//     TCGv_i64 handler = tcg_temp_new_i64();
-//     uint64_t dret_handler_addr = DRET_HANDLER_ADDR;
-//     handler = tcg_constant_i64(dret_handler_addr);
+    gen_helper_cjmp(tcg_env);
     
-//     // Switch to kernel mode
-//     gen_helper_dret(tcg_env, dret_handler_addr);
+    TCGv_i64 dst;
 
-//     return true;
-// }
+    if (s->current_el == 0) {
+        return false;
+    }
+    dst = tcg_temp_new_i64();
+    tcg_gen_ld_i64(dst, tcg_env,
+                   offsetof(CPUARMState, elr_el[s->current_el]));
 
-// static bool trans_DEXIT(DisasContext *s, arg_DEXIT *a)
-// {
-//     // Switch to user mode
-//     return true;
-// }
-//#endif 
+    translator_io_start(&s->base);
+    gen_helper_exception_return(tcg_env, dst);
+    s->base.is_jmp = DISAS_EXIT;
+
+    //gen_helper_cjmp(tcg_env);
+
+    return true;
+}
 
 /*
  * The instruction disassembly implemented here matches

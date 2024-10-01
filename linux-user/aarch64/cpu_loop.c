@@ -168,6 +168,24 @@ void cpu_loop(CPUARMState *env)
             break;
         //#ifdef TARGET_CRYPTO_CAP
         case EXCP_CCALL:
+            //        /* On syscall, PSTATE.ZA is preserved, PSTATE.SM is cleared. */
+            // aarch64_set_svcr(env, 0, R_SVCR_SM_MASK);
+            // ret = do_syscall(env,
+            //                  env->xregs[8],
+            //                  env->xregs[0],
+            //                  env->xregs[1],
+            //                  env->xregs[2],
+            //                  env->xregs[3],
+            //                  env->xregs[4],
+            //                  env->xregs[5],
+            //                  0, 0);
+            // if (ret == -QEMU_ERESTARTSYS) {
+            //     env->pc -= 4;
+            // } else if (ret != -QEMU_ESIGRETURN) {
+            //     env->xregs[0] = ret;
+            // }
+            break;
+        case EXCP_CRET:
             break;
         //#endif
         default:

@@ -10758,7 +10758,8 @@ void arm_log_exception(CPUState *cs)
             [EXCP_DIVBYZERO] = "v7M DIVBYZERO UsageFault",
             [EXCP_VSERR] = "Virtual SERR",
             [EXCP_GPC] = "Granule Protection Check",
-            [EXCP_CCALL] = "Cross Domain Call",
+            [EXCP_CCALL] = "CCALL",
+            [EXCP_CRET] = "CRET",
 
         };
 
@@ -11121,6 +11122,8 @@ static void arm_cpu_do_interrupt_aarch32_hyp(CPUState *cs)
     //#ifdef TARGET_CRYPTO_CAP
     case EXCP_CCALL:
         break;
+    case EXCP_CRET:
+        break;
     //#endif
     default:
         cpu_abort(cs, "Unhandled exception 0x%x\n", cs->exception_index);
@@ -11330,7 +11333,9 @@ static void arm_cpu_do_interrupt_aarch32(CPUState *cs)
         mask = CPSR_A | CPSR_I | CPSR_F;
         offset = 0;
         break;
-     case EXCP_CCALL:
+    case EXCP_CCALL:
+        break;
+    case EXCP_CRET:
         break;
     default:
         cpu_abort(cs, "Unhandled exception 0x%x\n", cs->exception_index);
@@ -11458,8 +11463,11 @@ static bool syndrome_is_sync_extabt(uint32_t syndrome)
         return false;
     }
 }
-
+//#ifdef TARGET_CRYPTO_CAP
+//TODO: Solve linker script issue add a register to save here from hardcoded addresses.
 #define CCALL_HANDLER_ADDR 0xffff800081102000;
+#define CRET_HANDLER_ADDR 0xffff800081102090;
+//#endif 
 
 /* Handle exception entry to a target EL which is using AArch64 */
 static void arm_cpu_do_interrupt_aarch64(CPUState *cs)
@@ -11540,6 +11548,7 @@ static void arm_cpu_do_interrupt_aarch64(CPUState *cs)
     case EXCP_SWI:
     //#ifdef TARGET_CRYPTO_CAP
     case EXCP_CCALL:
+    case EXCP_CRET:
     //#endif
     case EXCP_HVC:
     case EXCP_HYP_TRAP:
@@ -11676,6 +11685,9 @@ static void arm_cpu_do_interrupt_aarch64(CPUState *cs)
     //#ifdef TARGET_CRYPTO_CAP
     if (cs->exception_index == EXCP_CCALL){ 
         env->pc = (uint64_t)CCALL_HANDLER_ADDR;
+    }
+    else if (cs->exception_index == EXCP_CRET){ 
+        env->pc = (uint64_t)CRET_HANDLER_ADDR;
     }
     else{
     //#endif

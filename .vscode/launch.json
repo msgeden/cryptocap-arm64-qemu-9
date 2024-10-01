@@ -68,8 +68,8 @@
               //"-icount sleep=off",
               //"-accel tcg,thread=single",
               //"-d", "in_asm,op,out_asm,cpu,mmu,int,exec", //--"-one-insn-per-tb" is used as "-singlestep" in old versions
-              "-d", "int,cpu_reset", //--"-one-insn-per-tb" is used as "-singlestep" in old versions
-              "-D", "${workspaceFolder}/../logs/qemu-system-aarch64-${config:qemu.test_file}.log",
+              //"-d", "int,cpu_reset", //--"-one-insn-per-tb" is used as "-singlestep" in old versions
+              //"-D", "${workspaceFolder}/../logs/qemu-system-aarch64-${config:qemu.test_file}.log",
               //"-kernel", "${workspaceFolder}/../tests/${config:qemu.test_file}",
             ],
             "stopAtEntry": true,

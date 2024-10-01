@@ -505,6 +505,8 @@ void cpu_loop(CPUARMState *env)
         //#ifdef TARGET_CRYPTO_CAP
         case EXCP_CCALL:
             break;
+        case EXCP_CRET:
+            break;
         //#endif
         default:
         error:

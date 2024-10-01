@@ -141,5 +141,6 @@ DEF_HELPER_6(csign, void, env, i64, i64, i32, i64, i64)
 DEF_HELPER_1(updtcr, void, env)
 DEF_HELPER_1(updckeys, void, env)
 DEF_HELPER_1(ccall, void, env)
-DEF_HELPER_2(cret, void, env, i64)
+DEF_HELPER_1(cret, void, env)
+DEF_HELPER_1(cjmp, void, env)
 // //endif

@@ -48,11 +48,11 @@
                 "-nographic",
                 "-kernel",
                 "${env:HOME}/cryptocap-arm64/tests/${config:qemu.test_file}",
-                "-d",
-                "cpu_reset,int",
+                //"-d",
+                //"cpu_reset,int",
                 //"in_asm,op,out_asm,cpu,mmu,int,exec",
-                "-D",
-                "${env:HOME}/cryptocap-arm64/logs/qemu-user-aarch64-${config:qemu.test_file}-system.log",
+                //"-D",
+                //"${env:HOME}/cryptocap-arm64/logs/qemu-user-aarch64-${config:qemu.test_file}-system.log",
               
             ],
             "group": {
@@ -113,11 +113,11 @@
                 "${env:HOME}/cryptocap-arm64/linux-busybox/busybox-1_36_0/initramfs.cpio.gz",
                 "-append",
                 "console=ttyAMA0 root=/dev/vda nokaslr",
-                "-d",
-                "cpu_reset,int",
+                //"-d",
+                //"cpu_reset,int",
                 //"in_asm,op,out_asm,cpu,mmu,int,exec",
-                "-D",
-                "${env:HOME}/cryptocap-arm64/logs/qemu-user-aarch64-${config:qemu.test_file}-system.log",
+                //"-D",
+                //"${env:HOME}/cryptocap-arm64/logs/qemu-user-aarch64-${config:qemu.test_file}-system.log",
               
                 //"-S -gdb tcp::1234"
             ],

@@ -69,6 +69,7 @@
 #define EXCP_GPC            25   /* v9 Granule Protection Check Fault */
 //#ifdef TARGET_CRYPTO_CAP
 #define EXCP_CCALL            26   /* Cross Domain Call (CCALL) */
+#define EXCP_CRET            27   /* Cross Domain Return (CRET) */
 //#endif
 
 /* NB: add new EXCP_ defines to the array in arm_log_exception() too */
