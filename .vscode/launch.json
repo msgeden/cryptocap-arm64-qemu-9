@@ -1,68 +1,44 @@
 {
     "version": "0.2.0",
-    
     "configurations": [
+        {           
+            "name": "(lldb) Launch linux 6.5.7 + busybox system-aarch64 for mac M1",
+            "type": "lldb",
+            "request": "launch",
+            "program": "${workspaceFolder}/build/qemu-system-aarch64",
+            "args": [
+              "-machine", "virt",
+              "-cpu", "cortex-a53",
+              "-smp", "1",
+              "-m", "2G",
+              "-nographic",
+              "-kernel", "${env:HOME}/cryptocap-arm64/linux-busybox/linux-6.5.7/arch/arm64/boot/Image",
+              "-initrd", "${env:HOME}/cryptocap-arm64/linux-busybox/busybox-1_36_0/initramfs.cpio.gz",
+              "-append", "console=ttyAMA0 root=/dev/vda nokaslr",
+              //"-gdb", "tcp::1234",
+              //"-S"
+            ],     
+            "cwd": "${fileDirname}",
+            // "setupCommands": [
+            //     {
+            //       "text": "process handle SIGUSR2 -n true -p true -s false"
+            //     }
+            // ]
+        },
         {
-            "name": "(gdb) Debug linux + busybox system-aarch64",
+            "name": "(gdb) Launch linux 6.10 + busybox system-aarch64",
             "type": "cppdbg",
             "request": "launch",
             "program": "${workspaceFolder}/build/qemu-system-aarch64",
-            //"args": ["--version"],
             "args": [
               "-machine", "virt",
-              "-cpu", "cortex-a57",
+              "-cpu", "cortex-a53",
               "-smp", "1",
               "-m", "2G",
               "-nographic",
               "-kernel", "${env:HOME}/cryptocap-arm64/linux-busybox/linux-6.10/arch/arm64/boot/Image",
               "-initrd", "${env:HOME}/cryptocap-arm64/linux-busybox/busybox-1_36_0/initramfs.cpio.gz",
               "-append", "console=ttyAMA0 root=/dev/vda nokaslr",
-              "-gdb", "tcp::1234",
-              "-S"],
-            "stopAtEntry": true,
-            "cwd": "${workspaceFolder}",
-            "environment": [],
-            "externalConsole": false,
-            "MIMode": "gdb",
-            "setupCommands": [
-                {
-                    "description": "Enable pretty-printing for gdb",
-                    "text": "-enable-pretty-printing",
-                    "ignoreFailures": true
-                }
-            ],
-            "miDebuggerPath": "/usr/bin/gdb",  // Ensure this is the correct path to your gdb
-            //"miDebuggerServerAddress": "localhost:1234",
-            //"preLaunchTask": "build QEMU",
-            //"postDebugTask": "run QEMU",
-            //"targetArchitecture": "x86_64",
-            //"debugServerPath": "${workspaceFolder}/build/qemu-system-x86_64",
-            //"debugServerArgs": "-S -s -nographic -machine virt -kernel test",
-            //"serverStarted": "QEMU [0-9]+ host:port: localhost:1234",
-            //"filterStderr": true,
-            //"filterStdout": true
-        },
-        {
-            "name": "(gdb) Launch linux + busybox system-aarch64",
-            "type": "cppdbg",
-            "request": "launch",
-            "program": "${workspaceFolder}/build/qemu-system-aarch64",
-            //"args": ["--version"],
-            "args": [
-              "-machine", "virt",
-              "-cpu", "cortex-a57",
-              "-smp", "1",
-              "-m",
-              "2G",
-              "-nographic",
-              "-kernel",
-              //"${env:HOME}/cryptocap-arm64/linux-busybox/linux-6.6.46/arch/arm64/boot/Image",
-              "${env:HOME}/cryptocap-arm64/linux-busybox/linux-6.10/arch/arm64/boot/Image",
-              "-initrd",
-              //"${env:HOME}/cryptocap-arm64/linux-busybox/busybox-1.36.1/initramfs.cpio.gz",
-              "${env:HOME}/cryptocap-arm64/linux-busybox/busybox-1_36_0/initramfs.cpio.gz",
-              "-append",
-              "console=ttyAMA0 root=/dev/vda nokaslr",
               //disable optimisations
               //"-icount shift=0",
               //"-icount sleep=off",
@@ -71,51 +47,8 @@
               //"-d", "int,cpu_reset", //--"-one-insn-per-tb" is used as "-singlestep" in old versions
               //"-D", "${workspaceFolder}/../logs/qemu-system-aarch64-${config:qemu.test_file}.log",
               //"-kernel", "${workspaceFolder}/../tests/${config:qemu.test_file}",
-            ],
-            "stopAtEntry": true,
-            "cwd": "${workspaceFolder}",
-            "environment": [],
-            "externalConsole": false,
-            "MIMode": "gdb",
-            "setupCommands": [
-                {
-                    "description": "Enable pretty-printing for gdb",
-                    "text": "-enable-pretty-printing",
-                    "ignoreFailures": true
-                }
-            ],
-            "miDebuggerPath": "/usr/bin/gdb",  // Ensure this is the correct path to your gdb
-            //"miDebuggerServerAddress": "localhost:1234",
-            //"preLaunchTask": "build QEMU",
-            //"postDebugTask": "run QEMU",
-            //"targetArchitecture": "x86_64",
-            //"debugServerPath": "${workspaceFolder}/build/qemu-system-x86_64",
-            //"debugServerArgs": "-S -s -nographic -machine virt -kernel test",
-            //"serverStarted": "QEMU [0-9]+ host:port: localhost:1234",
-            //"filterStderr": true,
-            //"filterStdout": true
-        },
-        {
-            "name": "(gdb) Launch system-aarch64 pi3",
-            "type": "cppdbg",
-            "request": "launch",
-            "program": "${workspaceFolder}/build/qemu-system-aarch64",
-            //"args": ["--version"],
-            //"args": ["-machine virt -cpu cortex-a57 -nographic -kernel ${workspaceFolder}/../tests/${config:qemu.test_file}.elf -S -gdb tcp::1234"],
-            "args": [
-              "-M", "raspi3b",
-              "-cpu", "cortex-a72",
-              "-append", "rw earlyprintk loglevel=8 console=ttyAMA0,115200 dwc_otg.lpm_enable=0 root=/dev/mmcblk0p2 rootdelay=1",
-              "-dtb", "${env:HOME}/cryptocap-arm64/images/raspi/bcm2710-rpi-3-b-plus.dtb",
-              "-sd", "${env:HOME}/cryptocap-arm64/images/raspi/disk.img",
-              "-kernel", "${env:HOME}/cryptocap-arm64/images/raspi/kernel8.img",
-              "-m", "4G",
-              "-smp", "4",
-              "-serial", "stdio",
-              //"-nographic",
-              //"-d", "in_asm,op,out_asm,cpu,fpu,mmu,int,exec", //--"-one-insn-per-tb" is used as "-singlestep" in old versions
-              //"-D", "${workspaceFolder}/../logs/qemu-system-aarch64-pi3.log",
-            ],
+              //"-gdb", "tcp::1234", "-S"
+              ],
             "stopAtEntry": true,
             "cwd": "${workspaceFolder}",
             "environment": [],
@@ -144,11 +77,9 @@
             "type": "cppdbg",
             "request": "launch",
             "program": "${workspaceFolder}/build/qemu-system-aarch64",
-            //"args": ["--version"],
-            //"args": ["-machine virt -cpu cortex-a57 -nographic -kernel ${workspaceFolder}/../tests/${config:qemu.test_file}.elf -S -gdb tcp::1234"],
             "args": [
               "-machine", "virt",
-              "-cpu", "cortex-a57",
+              "-cpu", "cortex-a53",
               "-smp", "1",
               "-nographic",
               //"-d", "in_asm,op,out_asm,cpu,exec", //--"-one-insn-per-tb" is used as "-singlestep" in old versions
@@ -168,15 +99,6 @@
                 }
             ],
             "miDebuggerPath": "/usr/bin/gdb",  // Ensure this is the correct path to your gdb
-            //"miDebuggerServerAddress": "localhost:1234",
-            //"preLaunchTask": "build QEMU",
-            //"postDebugTask": "run QEMU",
-            //"targetArchitecture": "x86_64",
-            //"debugServerPath": "${workspaceFolder}/build/qemu-system-x86_64",
-            //"debugServerArgs": "-S -s -nographic -machine virt -kernel test",
-            //"serverStarted": "QEMU [0-9]+ host:port: localhost:1234",
-            //"filterStderr": true,
-            //"filterStdout": true
         },
         {
             "name": "(gdb) Launch user-aarch64",
