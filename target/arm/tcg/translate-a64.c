@@ -1789,7 +1789,7 @@ static bool trans_CCALL(DisasContext *s, arg_CCALL *a)
 
     gen_helper_ccall(tcg_env);
 
-    uint32_t syndrome = syn_aa64_svc(1);
+    uint32_t syndrome = syn_aa64_svc(0);
     gen_ss_advance(s);
     gen_exception_insn(s, 4, EXCP_CCALL, syndrome);
 
@@ -1801,7 +1801,7 @@ static bool trans_CRET(DisasContext *s, arg_CRET *a)
 {
     gen_helper_cret(tcg_env);
 
-    uint32_t syndrome = syn_aa64_svc(2);
+    uint32_t syndrome = syn_aa64_svc(0);
     gen_ss_advance(s);
     gen_exception_insn(s, 4, EXCP_CRET, syndrome);
 

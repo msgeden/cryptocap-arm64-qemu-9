@@ -11465,8 +11465,8 @@ static bool syndrome_is_sync_extabt(uint32_t syndrome)
 }
 //#ifdef TARGET_CRYPTO_CAP
 //TODO: Solve linker script issue add a register to save here from hardcoded addresses.
-#define CCALL_HANDLER_ADDR 0xffff800081102000;
-#define CRET_HANDLER_ADDR 0xffff800081102090;
+#define CCALL_HANDLER_ADDR 0xffff80008103e000;
+#define CRET_HANDLER_ADDR 0xffff80008103e0c0;
 //#endif 
 
 /* Handle exception entry to a target EL which is using AArch64 */

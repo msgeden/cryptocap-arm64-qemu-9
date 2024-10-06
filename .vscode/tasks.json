@@ -7,6 +7,22 @@
             "command": "lldb --batch -o 'process handle SIGUSR2 -n true -p true -s false'"
         },
         {
+            "label": "configure QEMU for ubuntu arm64",
+            "type": "shell",
+            "command": "../configure",
+            "args": [
+                "--target-list=aarch64-softmmu, aarch64-linux-user",
+                "--enable-debug",
+                "--enable-debug-tcg",
+                "--enable-trace-backends=simple",
+                //"--enable-slirp" //for user-mode networking support 
+            ],
+            "options": {
+                "cwd": "${workspaceFolder}/build"
+            },
+            "problemMatcher": []
+        },
+        {
             "label": "configure QEMU for mac M1",
             "type": "shell",
             "command": "../configure",
