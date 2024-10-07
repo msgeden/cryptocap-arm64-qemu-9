@@ -19,7 +19,7 @@
         "tcg-internal.h": "c",
         "semihost.h": "c"
     },
-    "qemu.test_file":"test_ccall_cret",
+    "qemu.test_file":"test_clc_clr",
     "home": "${env:HOME}",
     "cmake.sourceDirectory": "${env:HOME}/cryptocap-arm64/qemu-9/build/meson-private/cmake_SDL2",
 }

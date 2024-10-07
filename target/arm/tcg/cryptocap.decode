@@ -32,6 +32,7 @@
 &imm_rs imm rs  
 &imm_rs1_rs2 imm rs1 rs2
 &nill   
+&cc_rs cc rs  
 
 
 #OPERATION TYPES
@@ -46,6 +47,7 @@
 @op_crs                 ... .... ..... ..... ..... ..... crs:5 &crs
 @op_imm_rs1_rs2         ... .... ..... ..... .... imm:1 rs1:5 rs2:5 &imm_rs1_rs2
 @op_nill                ... .... ..... ..... ..... ..... ..... &nill
+@op_cc_rs          ... .... ..... ..... ..... .... cc:1 rs:5 &cc_rs
 
 
 #CAPABILITY MANIPULATION INSTRUCTIONS
@@ -59,6 +61,7 @@ CSETADDR    000 0001 01000 00000 ..... ..... .....  @op_crd_crs_rs
 CSIGN       000 0001 01001 00000 00000 00000 .....  @op_crs
 #this is an illegal/temporary user instruction placed for debug purposes, which will require EL1 privileges later.
 CSETPT      000 0001 10100 00000 ..... ..... .....  @op_crd_crs_rs
+
 
 
 #OTHER INSTRUCTIONS
@@ -85,13 +88,15 @@ CSTG        000 0001 00011 ........ .. ..... .....  @op_imm_idx_r_cr
 #cross-domaion capability load
 CLDC        000 0001 00100 ........ .. ..... .....  @op_imm_idx_crd_crs
 
-#BRANCH INSTRUCTIONS
+#DOMAIN SWITCH INSTRUCTIONS
+#EL0 -> EL1
 CCALL    000 0001 01101 00000 00000 00000 .....  @op_rs
 CRET    000 0001 01110 00000 00000 00000 00000  @op_nill
+#EL1 -> EL0
 CJMP    000 0001 10101 00000 00000 00000 00000  @op_nill
 
-#BRANCH INSTRUCTIONS
-#DCALL    000 0001 10101 00000 00000 00000 .....  @op_rs
-#DRET    000 0001 10110 00000 00000 00000 00000  @op_nill
-#PRIVILEGE MODE CHANGE
-#DEXIT    000 0001 10111 00000 00000 00000 00000  @op_nill
+CLPC    000 0001 10110 00000 00000 0000 . ..... @op_cc_rs
+CLSP    000 0001 10111 00000 00000 0000 . ..... @op_cc_rs
+CLPT    000 0001 11000 00000 00000 0000 . ..... @op_cc_rs
+LDCL    000 0001 11001 00000 00000 0000 . ..... @op_cc_rs
+STCL    000 0001 11010 00000 00000 0000 . ..... @op_cc_rs

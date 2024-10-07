@@ -52,8 +52,19 @@ typedef struct TCGv_c256 {
     TCGv_i64 MAC;
 } TCGv_c256;
 
+typedef struct TCGv_cd256 {
+    TCGv_i64 PC;
+    TCGv_i64 SP;
+    TCGv_i64 PT;
+    TCGv_i64 MAC;
+} TCGv_cd256;
+
 //static TCGv_i64_x4 cpu_C[CAPREG_SIZE];
 static TCGv_c256 cpu_CC[CAPREG_SIZE];
+static TCGv_cd256 cpu_CLC;
+static TCGv_cd256 cpu_CLR;
+
+
 
 static inline TCGv_i32 TCGV_LOWER(TCGv_i64 t)
 {
@@ -1831,6 +1842,153 @@ static bool trans_CJMP(DisasContext *s, arg_CJMP *a)
 
     return true;
 }
+
+
+static bool trans_CLPC(DisasContext *s, arg_CLPC *a)
+{
+    //set PC value of ccall target register (CLC)
+    if (a->cc)
+        tcg_gen_mov_i64(cpu_CLC.PC, cpu_X[a->rs]);
+    //set PC value of cret link register (CLR)
+    else
+        tcg_gen_mov_i64(cpu_CLR.PC, cpu_X[a->rs]);
+    return true;
+}
+static bool trans_CLSP(DisasContext *s, arg_CLSP *a)
+{
+    //set SP value of ccall target register (CLC)
+    if (a->cc)
+        tcg_gen_mov_i64(cpu_CLC.SP, cpu_X[a->rs]);
+    //set SP value of cret link register (CLR)
+    else
+        tcg_gen_mov_i64(cpu_CLR.SP, cpu_X[a->rs]);
+    return true;
+}
+static bool trans_CLPT(DisasContext *s, arg_CLPT *a)
+{
+    //set PT Base value of ccall target register (CLC)
+    if (a->cc)
+        tcg_gen_mov_i64(cpu_CLC.PT, cpu_X[a->rs]);
+    //set PT Base value of cret link register (CLR)
+    else
+        tcg_gen_mov_i64(cpu_CLR.PT, cpu_X[a->rs]);
+    return true;
+}
+
+static bool trans_LDCL(DisasContext *s, arg_LDCL *a)
+{
+    TCGv_i64 addr = tcg_temp_new_i64();
+    tcg_gen_mov_i64(addr, cpu_reg(s, a->rs));
+  
+    TCGv_i64 tmp1 = tcg_temp_new_i64();
+    TCGv_i64 tmp2 = tcg_temp_new_i64();
+    TCGv_i64 tmp3 = tcg_temp_new_i64();
+    TCGv_i64 tmp4 = tcg_temp_new_i64();
+    
+    //load 256-bit ccall target register (CLC) from the memory
+    if (a->cc){
+        //PC
+        tcg_gen_qemu_ld_i64(tmp1, addr, get_mem_index(s), MO_64);
+        tcg_gen_st_i64(tmp1, tcg_env, offsetof(CPUARMState, clc.PC));
+        tcg_gen_addi_i64(addr, addr, 8);
+        
+        //SP
+        tcg_gen_qemu_ld_i64(tmp2, addr, get_mem_index(s), MO_64);
+        tcg_gen_st_i64(tmp2, tcg_env, offsetof(CPUARMState, clc.SP));
+        tcg_gen_addi_i64(addr, addr, 8);
+        
+        //PT
+        tcg_gen_qemu_ld_i64(tmp3, addr, get_mem_index(s), MO_64);
+        tcg_gen_st_i64(tmp3, tcg_env, offsetof(CPUARMState, clc.PT));
+        tcg_gen_addi_i64(addr, addr, 8);
+        
+        //MAC
+        tcg_gen_qemu_ld_i64(tmp4, addr, get_mem_index(s), MO_64);
+        tcg_gen_st_i64(tmp4, tcg_env, offsetof(CPUARMState, clc.MAC));
+    }
+    //load 256-bit cret link register (CLR) from the memory
+    else{
+        //PC
+        tcg_gen_qemu_ld_i64(tmp1, addr, get_mem_index(s), MO_64);
+        tcg_gen_st_i64(tmp1, tcg_env, offsetof(CPUARMState, clr.PC));
+        tcg_gen_addi_i64(addr, addr, 8);
+        
+        //SP
+        tcg_gen_qemu_ld_i64(tmp2, addr, get_mem_index(s), MO_64);
+        tcg_gen_st_i64(tmp2, tcg_env, offsetof(CPUARMState, clr.SP));
+        tcg_gen_addi_i64(addr, addr, 8);
+        
+        //PT
+        tcg_gen_qemu_ld_i64(tmp3, addr, get_mem_index(s), MO_64);
+        tcg_gen_st_i64(tmp3, tcg_env, offsetof(CPUARMState, clr.PT));
+        tcg_gen_addi_i64(addr, addr, 8);
+        
+        //MAC
+        tcg_gen_qemu_ld_i64(tmp4, addr, get_mem_index(s), MO_64);
+        tcg_gen_st_i64(tmp4, tcg_env, offsetof(CPUARMState, clr.MAC));
+    }
+    return true;
+}
+static bool trans_STCL(DisasContext *s, arg_STCL *a)
+{   
+    TCGv_i64 addr = tcg_temp_new_i64();
+    tcg_gen_mov_i64(addr, cpu_reg(s, a->rs));
+    
+    TCGv_i64 tmp1 = tcg_temp_new_i64();
+    TCGv_i64 tmp2 = tcg_temp_new_i64();
+    TCGv_i64 tmp3 = tcg_temp_new_i64();
+    TCGv_i64 tmp4 = tcg_temp_new_i64();
+  
+    //store 256-bit ccall target register (CLC) to the memory
+    if (a->cc){
+    
+        //PC
+        tcg_gen_ld_i64(tmp1, tcg_env, offsetof(CPUARMState, clc.PC));
+        tcg_gen_qemu_st_i64(tmp1, addr, get_mem_index(s), MO_64);
+        tcg_gen_addi_i64(addr, addr, 8);
+
+        //SP
+        tcg_gen_ld_i64(tmp2, tcg_env, offsetof(CPUARMState, clc.SP));
+        tcg_gen_qemu_st_i64(tmp2, addr, get_mem_index(s), MO_64);
+        tcg_gen_addi_i64(addr, addr, 8);
+
+        //PT
+        tcg_gen_ld_i64(tmp3, tcg_env, offsetof(CPUARMState, clc.PT));
+        tcg_gen_qemu_st_i64(tmp3, addr, get_mem_index(s), MO_64);
+        tcg_gen_addi_i64(addr, addr, 8);
+
+        //PT
+        tcg_gen_ld_i64(tmp4, tcg_env, offsetof(CPUARMState, clc.MAC));
+        tcg_gen_qemu_st_i64(tmp4, addr, get_mem_index(s), MO_64);
+        tcg_gen_addi_i64(addr, addr, 8);
+    }    
+    //store 256-bit cret link register (CLR) to the memory
+    else{
+
+        //PC
+        tcg_gen_ld_i64(tmp1, tcg_env, offsetof(CPUARMState, clr.PC));
+        tcg_gen_qemu_st_i64(tmp1, addr, get_mem_index(s), MO_64);
+        tcg_gen_addi_i64(addr, addr, 8);
+
+        //SP
+        tcg_gen_ld_i64(tmp2, tcg_env, offsetof(CPUARMState, clr.SP));
+        tcg_gen_qemu_st_i64(tmp2, addr, get_mem_index(s), MO_64);
+        tcg_gen_addi_i64(addr, addr, 8);
+
+        //PT
+        tcg_gen_ld_i64(tmp3, tcg_env, offsetof(CPUARMState, clr.PT));
+        tcg_gen_qemu_st_i64(tmp3, addr, get_mem_index(s), MO_64);
+        tcg_gen_addi_i64(addr, addr, 8);
+
+        //PT
+        tcg_gen_ld_i64(tmp4, tcg_env, offsetof(CPUARMState, clr.MAC));
+        tcg_gen_qemu_st_i64(tmp4, addr, get_mem_index(s), MO_64);
+        tcg_gen_addi_i64(addr, addr, 8);
+    }
+
+    return true;
+}
+//#endif
 
 /*
  * The instruction disassembly implemented here matches
