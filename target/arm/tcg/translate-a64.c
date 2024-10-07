@@ -168,6 +168,17 @@ void a64_translate_init(void)
                                           offsetof(CPUARMState, ccregs[i].MAC),
                                           name);
     }
+    
+    cpu_CLC.PC = tcg_global_mem_new_i64(tcg_env, offsetof(CPUARMState, clc.PC), "clc_pc");
+    cpu_CLC.SP = tcg_global_mem_new_i64(tcg_env, offsetof(CPUARMState, clc.SP), "clc_sp");
+    cpu_CLC.PT = tcg_global_mem_new_i64(tcg_env, offsetof(CPUARMState, clc.PT), "clc_pt");
+    cpu_CLC.MAC = tcg_global_mem_new_i64(tcg_env, offsetof(CPUARMState, clc.MAC), "clc_mac");
+   
+    cpu_CLR.PC = tcg_global_mem_new_i64(tcg_env, offsetof(CPUARMState, clr.PC), "clr_pc");
+    cpu_CLR.SP = tcg_global_mem_new_i64(tcg_env, offsetof(CPUARMState, clr.SP), "clr_sp");
+    cpu_CLR.PT = tcg_global_mem_new_i64(tcg_env, offsetof(CPUARMState, clr.PT), "clr_pt");
+    cpu_CLR.MAC = tcg_global_mem_new_i64(tcg_env, offsetof(CPUARMState, clr.MAC), "clr_mac");
+
     cpu_mkey_lo = tcg_global_mem_new_i64(tcg_env, offsetof(CPUARMState, mkey.lo), "mkey_lo");
     cpu_mkey_hi = tcg_global_mem_new_i64(tcg_env, offsetof(CPUARMState, mkey.hi), "mkey_hi");
     cpu_ekey_lo = tcg_global_mem_new_i64(tcg_env, offsetof(CPUARMState, ekey.lo), "ekey_lo");
@@ -1847,7 +1858,7 @@ static bool trans_CJMP(DisasContext *s, arg_CJMP *a)
 static bool trans_CLPC(DisasContext *s, arg_CLPC *a)
 {
     //set PC value of ccall target register (CLC)
-    if (a->cc)
+    if (a->cc==0)
         tcg_gen_mov_i64(cpu_CLC.PC, cpu_X[a->rs]);
     //set PC value of cret link register (CLR)
     else
@@ -1857,7 +1868,7 @@ static bool trans_CLPC(DisasContext *s, arg_CLPC *a)
 static bool trans_CLSP(DisasContext *s, arg_CLSP *a)
 {
     //set SP value of ccall target register (CLC)
-    if (a->cc)
+    if (a->cc==0)
         tcg_gen_mov_i64(cpu_CLC.SP, cpu_X[a->rs]);
     //set SP value of cret link register (CLR)
     else
@@ -1867,7 +1878,7 @@ static bool trans_CLSP(DisasContext *s, arg_CLSP *a)
 static bool trans_CLPT(DisasContext *s, arg_CLPT *a)
 {
     //set PT Base value of ccall target register (CLC)
-    if (a->cc)
+    if (a->cc==0)
         tcg_gen_mov_i64(cpu_CLC.PT, cpu_X[a->rs]);
     //set PT Base value of cret link register (CLR)
     else
@@ -1886,7 +1897,7 @@ static bool trans_LDCL(DisasContext *s, arg_LDCL *a)
     TCGv_i64 tmp4 = tcg_temp_new_i64();
     
     //load 256-bit ccall target register (CLC) from the memory
-    if (a->cc){
+    if (a->cc==0){
         //PC
         tcg_gen_qemu_ld_i64(tmp1, addr, get_mem_index(s), MO_64);
         tcg_gen_st_i64(tmp1, tcg_env, offsetof(CPUARMState, clc.PC));
@@ -1940,7 +1951,7 @@ static bool trans_STCL(DisasContext *s, arg_STCL *a)
     TCGv_i64 tmp4 = tcg_temp_new_i64();
   
     //store 256-bit ccall target register (CLC) to the memory
-    if (a->cc){
+    if (a->cc==0){
     
         //PC
         tcg_gen_ld_i64(tmp1, tcg_env, offsetof(CPUARMState, clc.PC));

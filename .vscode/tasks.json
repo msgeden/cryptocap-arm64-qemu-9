@@ -223,7 +223,7 @@
                 "in_asm,op,out_asm,cpu,mmu,int,exec",
                 "-D",
                 "${env:HOME}/cryptocap-arm64/logs/qemu-user-aarch64-${config:qemu.test_file}.log",
-                "${env:HOME}/cryptocap-arm64/tests/${config:qemu.test_file}"
+                "${env:HOME}/cryptocap-arm64/linux-busybox/busybox-1_36_0/rootfs/tests/${config:qemu.test_file}"
             ],
             "group": {
                 "kind": "test",
