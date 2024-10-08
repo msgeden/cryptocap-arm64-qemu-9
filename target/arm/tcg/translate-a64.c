@@ -1857,39 +1857,89 @@ static bool trans_CJMP(DisasContext *s, arg_CJMP *a)
 
 static bool trans_CLPC(DisasContext *s, arg_CLPC *a)
 {
-    //set PC value of ccall target register (CLC)
-    if (a->cc==0)
-        tcg_gen_mov_i64(cpu_CLC.PC, cpu_X[a->rs]);
-    //set PC value of cret link register (CLR)
-    else
-        tcg_gen_mov_i64(cpu_CLR.PC, cpu_X[a->rs]);
+    if (a->rw==0){
+        //set PC value of ccall target register (CLC)
+        if (a->cc==0)
+            tcg_gen_mov_i64(cpu_CLC.PC, cpu_X[a->r]);
+        //set PC value of cret link register (CLR)
+        else
+            tcg_gen_mov_i64(cpu_CLR.PC, cpu_X[a->r]);
+    }
+    else{
+        //read PC value of ccall target register (CLC)
+        if (a->cc==0)
+            tcg_gen_mov_i64(cpu_X[a->r], cpu_CLC.PC);
+        //read PC value of cret link register (CLR)
+        else
+            tcg_gen_mov_i64(cpu_X[a->r], cpu_CLR.PC);
+    }
     return true;
 }
 static bool trans_CLSP(DisasContext *s, arg_CLSP *a)
 {
-    //set SP value of ccall target register (CLC)
-    if (a->cc==0)
-        tcg_gen_mov_i64(cpu_CLC.SP, cpu_X[a->rs]);
-    //set SP value of cret link register (CLR)
-    else
-        tcg_gen_mov_i64(cpu_CLR.SP, cpu_X[a->rs]);
+    if (a->rw==0){
+        //set SP value of ccall target register (CLC)
+        if (a->cc==0)
+            tcg_gen_mov_i64(cpu_CLC.SP, cpu_X[a->r]);
+        //set SP value of cret link register (CLR)
+        else
+            tcg_gen_mov_i64(cpu_CLR.SP, cpu_X[a->r]);
+    }
+    else{
+        //read SP value of ccall target register (CLC)
+        if (a->cc==0)
+            tcg_gen_mov_i64(cpu_X[a->r], cpu_CLC.SP);
+        //read SP value of cret link register (CLR)
+        else
+            tcg_gen_mov_i64(cpu_X[a->r], cpu_CLR.SP);
+    }
     return true;
 }
 static bool trans_CLPT(DisasContext *s, arg_CLPT *a)
 {
-    //set PT Base value of ccall target register (CLC)
-    if (a->cc==0)
-        tcg_gen_mov_i64(cpu_CLC.PT, cpu_X[a->rs]);
-    //set PT Base value of cret link register (CLR)
-    else
-        tcg_gen_mov_i64(cpu_CLR.PT, cpu_X[a->rs]);
+    if (a->rw==0){
+        //set PT value of ccall target register (CLC)
+        if (a->cc==0)
+            tcg_gen_mov_i64(cpu_CLC.PT, cpu_X[a->r]);
+        //set PT value of cret link register (CLR)
+        else
+            tcg_gen_mov_i64(cpu_CLR.PT, cpu_X[a->r]);
+    }
+    else{
+        //read PT value of ccall target register (CLC)
+        if (a->cc==0)
+            tcg_gen_mov_i64(cpu_X[a->r], cpu_CLC.PT);
+        //read PT value of cret link register (CLR)
+        else
+            tcg_gen_mov_i64(cpu_X[a->r], cpu_CLR.PT);
+    }
     return true;
 }
 
+static bool trans_CLMAC(DisasContext *s, arg_CLMAC *a)
+{
+    if (a->rw==0){
+        //set MAC value of ccall target register (CLC)
+        if (a->cc==0)
+            tcg_gen_mov_i64(cpu_CLC.MAC, cpu_X[a->r]);
+        //set MAC value of cret link register (CLR)
+        else
+            tcg_gen_mov_i64(cpu_CLR.MAC, cpu_X[a->r]);
+    }
+    else{
+        //read MAC value of ccall target register (CLC)
+        if (a->cc==0)
+            tcg_gen_mov_i64(cpu_X[a->r], cpu_CLC.MAC);
+        //read MAC value of cret link register (CLR)
+        else
+            tcg_gen_mov_i64(cpu_X[a->r], cpu_CLR.MAC);
+    }
+    return true;
+}
 static bool trans_LDCL(DisasContext *s, arg_LDCL *a)
 {
     TCGv_i64 addr = tcg_temp_new_i64();
-    tcg_gen_mov_i64(addr, cpu_reg(s, a->rs));
+    tcg_gen_mov_i64(addr, cpu_reg(s, a->r));
   
     TCGv_i64 tmp1 = tcg_temp_new_i64();
     TCGv_i64 tmp2 = tcg_temp_new_i64();
@@ -1943,7 +1993,7 @@ static bool trans_LDCL(DisasContext *s, arg_LDCL *a)
 static bool trans_STCL(DisasContext *s, arg_STCL *a)
 {   
     TCGv_i64 addr = tcg_temp_new_i64();
-    tcg_gen_mov_i64(addr, cpu_reg(s, a->rs));
+    tcg_gen_mov_i64(addr, cpu_reg(s, a->r));
     
     TCGv_i64 tmp1 = tcg_temp_new_i64();
     TCGv_i64 tmp2 = tcg_temp_new_i64();
@@ -1999,6 +2049,42 @@ static bool trans_STCL(DisasContext *s, arg_STCL *a)
 
     return true;
 }
+
+// static bool trans_CLREADPC(DisasContext *s, arg_CLREADPC *a)
+// {
+  
+//     return true;
+// }
+// static bool trans_CLREADSP(DisasContext *s, arg_CLREADSP *a)
+// {
+//     //read PC value of ccall target register (CLC)
+//     if (a->cc==0)
+//         tcg_gen_mov_i64(cpu_X[a->r], cpu_CLC.SP);
+//     //read PC value of cret link register (CLR)
+//     else
+//         tcg_gen_mov_i64(cpu_X[a->r], cpu_CLR.SP);
+//     return true;
+// }
+// static bool trans_CLREADPT(DisasContext *s, arg_CLREADPT *a)
+// {
+//     //read PC value of ccall target register (CLC)
+//     if (a->cc==0)
+//         tcg_gen_mov_i64(cpu_X[a->r], cpu_CLC.PT);
+//     //read PC value of cret link register (CLR)
+//     else
+//         tcg_gen_mov_i64(cpu_X[a->r], cpu_CLR.PT);
+//     return true;
+// }
+// static bool trans_CLREADMAC(DisasContext *s, arg_CLREADMAC *a)
+// {
+//     //read PC value of ccall target register (CLC)
+//     if (a->cc==0)
+//         tcg_gen_mov_i64(cpu_X[a->r], cpu_CLC.MAC);
+//     //read PC value of cret link register (CLR)
+//     else
+//         tcg_gen_mov_i64(cpu_X[a->r], cpu_CLR.MAC);
+//     return true;
+// }
 //#endif
 
 /*
