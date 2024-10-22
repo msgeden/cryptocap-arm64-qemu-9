@@ -79,6 +79,8 @@ static TCGv_i64 cpu_tcr;
 static TCGv_i64 cpu_ptcr;
 static TCGv_i64 cpu_ttbr0_ns_cc;
 static TCGv_i64 cpu_ttbr1_ns_cc;
+static TCGv_i64 cpu_sp_el1;
+
 //#endif
 
 enum a64_shift_type {
@@ -187,6 +189,7 @@ void a64_translate_init(void)
     cpu_ptcr = tcg_global_mem_new_i64(tcg_env, offsetof(CPUARMState, ptcr), "ptcr");
     cpu_ttbr0_ns_cc = tcg_global_mem_new_i64(tcg_env, offsetof(CPUARMState, cp15.ttbr0_ns), "ttbr0_ns_cc");
     cpu_ttbr1_ns_cc = tcg_global_mem_new_i64(tcg_env, offsetof(CPUARMState, cp15.ttbr1_ns), "ttbr1_ns_cc");
+    cpu_sp_el1 = tcg_global_mem_new_i64(tcg_env, offsetof(CPUARMState, sp_el[1]), "sp_el1");
     
     //#end
 
@@ -1597,9 +1600,9 @@ static bool trans_CSIGN(DisasContext *s, arg_CSIGN *a)
     return true;
 }
 
-static bool trans_READTCR(DisasContext *s, arg_READTCR *a)
+static bool trans_READSPEL1(DisasContext *s, arg_READSPEL1 *a)
 {
-    tcg_gen_mov_i64(cpu_X[a->rs], cpu_tcr);
+    tcg_gen_mov_i64(cpu_X[a->rs], cpu_sp_el1);
     
     return true;
 }
@@ -1661,6 +1664,14 @@ static bool trans_READTTBR(DisasContext *s, arg_READTTBR *a)
     } 
     return true;
 }
+
+static bool trans_READTCR(DisasContext *s, arg_READTCR *a)
+{
+    tcg_gen_mov_i64(cpu_X[a->rs], cpu_tcr);
+    
+    return true;
+}
+
 static bool trans_LDC(DisasContext *s, arg_LDC *a)
 {
     TCGv_i64 addr = tcg_temp_new_i64();

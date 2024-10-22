@@ -11465,9 +11465,9 @@ static bool syndrome_is_sync_extabt(uint32_t syndrome)
 }
 //#ifdef TARGET_CRYPTO_CAP
 //TODO: Solve linker script issue add a register to save here from hardcoded addresses.
-#define CCALL_HANDLER_ADDR 0xffff80008103e000;
+#define CCALL_HANDLER_ADDR 0xffff8000810ba000;
 //#define CCALL_HANDLER_ADDR 0xffff800081a284a8;
-#define CRET_HANDLER_ADDR 0xffff80008103e0c0;
+#define CRET_HANDLER_ADDR 0xffff8000810ba0c8;
 //#define CRET_HANDLER_ADDR 0xffff800081a28568;
 //#endif 
 
