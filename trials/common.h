@@ -17,6 +17,14 @@ typedef struct cdom {
      uint64_t MAC;
 } cdom;
 
+typedef struct pdom {
+     uint64_t PC;
+     uint64_t SP;
+     uint64_t PT;
+     uint64_t MAC;
+     uint64_t PID;
+} pdom;
+
 uint64_t getPTBase() {
     uint64_t value=0xDEADBEEF;
     asm volatile(".word 0x03300000" : "=r"(value));  //readttbr x0
@@ -36,4 +44,10 @@ uint64_t getKernelSP() {
     asm volatile(".word 0x03c00000" : "=r"(value));  //readspel1 x0
     //printf("get_sp_el1(): 0x%lx\n", value);
     return value;
+}
+
+void wait_for_loop(void){
+    while(1) {
+        sleep(1);  // Wait for calls
+    }
 }
