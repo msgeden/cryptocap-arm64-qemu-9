@@ -215,6 +215,11 @@ typedef struct cdomreg {
      uint64_t PT;
      uint64_t MAC;
      } cdomreg;
+typedef struct cprocessreg {
+     uint64_t PID;
+     uint64_t PC;
+     uint64_t MAC;
+     } cprocessreg;
 typedef struct CCKey {
     uint64_t lo, hi;
 } CCKey;
@@ -249,6 +254,10 @@ typedef struct CPUArchState {
     cdomreg clc;
     //link capability register for cret instruction
     cdomreg clr;
+    //destination capability register for pcall instruction
+    cprocessreg cplc;
+    //link capability register for pret instruction
+    cprocessreg cplr;
     //key register for MAC
     CCKey mkey;
     //key register for encryption/decryption 
@@ -259,12 +268,12 @@ typedef struct CPUArchState {
     uint64_t ptcr;
     //cross-domain access flag for MMU
     bool cc_access_flag;
-    //since there is no direct association between page-walk and memory instructions, the pc+TTBR value is used as identifier to perform a page walk based on a cap.PT value
+    //IMPORTANT: Since there is no direct association between page-walk and memory instructions, the pc+TTBR0 value is used as identifier to perform a page walk based on a cap.PT value
     uint64_t cc_access_pc;
-    uint64_t cc_access_ttbr;
+    uint64_t cc_access_ttbr0;
     //secondary PT base register for a separate walk to be triggered by domain-crossing crypto capabilities
-    uint64_t cc_ttbr;
-    //uint64_t ttbr1_ns_cc;
+    uint64_t cc_ttbr0;
+    //uint64_t cc_ttbr1;
 //#endif
 
     /* PSTATE isn't an architectural register for ARMv8. However, it is

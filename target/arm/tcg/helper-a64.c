@@ -2119,18 +2119,13 @@ static bool is_bounds_violation(uint64_t base, uint32_t offset, uint32_t size){
 }
 
 static bool is_MAC_violation(uint64_t tcr, uint64_t perms_base, uint32_t size, uint64_t PT, uint64_t MAC, CCKey mkey){
-    //TODO: remove following condition
-    if (MAC==0) 
-        return false;
     uint64_t refMAC=computeMAC(tcr, perms_base, PT, size, mkey);
     return (MAC!=refMAC);
 }
 
 static bool is_privileged_mode(CPUARMState *env){
     int current_el = arm_current_el(env);
-    //TODO: kernel privileges
-    //return (current_el > 0);
-    return (current_el >= 0);
+    return (current_el > 0);
 }
 
 static bool is_cross_domain(CPUARMState *env, uint64_t PT){
@@ -2138,16 +2133,12 @@ static bool is_cross_domain(CPUARMState *env, uint64_t PT){
     // TTBR0: base register 0 (typically user space)
     // TTBR1: base register 1 (@should be for kernel space) we're using TTBR0_EL1, adjust if needed
    
-    uint64_t ttbr = env->cp15.ttbr0_ns;  // ns for non-secure mode s for secure mod we're using TTBR0_EL1, adjust if needed
+    uint64_t ttbr0 = env->cp15.ttbr0_ns;  // ns for non-secure mode s for secure mod we're using TTBR0_EL1, adjust if needed
     //uint64_t ttbr = env->cp15.ttbr1_ns;  // ns for non-secure mode s for secure mod we're using TTBR0_EL1, adjust if needed
     
-    //TODO: PT base register
-    //return (ttbr != PT);
-    //if (PT!=0 && ttbr != 0 && ttbr!=PT)
-    //    return true;
-    //else
-    //    return false;
-    return (PT != 0);
+    if (ttbr0 != 0 && ttbr0!=PT)
+        return true;
+    return false;
 }
 
 static bool is_host_domain(CPUARMState *env, uint64_t PT){
@@ -2155,14 +2146,12 @@ static bool is_host_domain(CPUARMState *env, uint64_t PT){
     // TTBR0: base register 0 (typically user space)
     // TTBR1: base register 1 (@should be for kernel space) we're using TTBR0_EL1, adjust if needed
     
-    uint64_t ttbr = env->cp15.ttbr0_ns;  // ns for non-secure mode s for secure mod we're using TTBR0_EL1, adjust if needed
+    uint64_t ttbr0 = env->cp15.ttbr0_ns;  // ns for non-secure mode s for secure mod we're using TTBR0_EL1, adjust if needed
     //uint64_t ttbr = env->cp15.ttbr1_ns;  // ns for non-secure mode s for secure mod we're using TTBR0_EL1, adjust if needed
-    //TODO: PT base register
-    //return (ttbr != PT);
-    if (PT == 0 || (PT!=0 && ttbr != 0 && ttbr==PT))
+  
+    if (PT == 0 || (PT!=0 && ttbr0 != 0 && ttbr0==PT))
         return true;
-    else
-        return false;
+    return false;
 }
 
 void HELPER(updtcr)(CPUARMState *env)
@@ -2193,15 +2182,15 @@ void HELPER(csign)(CPUARMState *env, uint64_t crs_idx, uint64_t perms_base, uint
         raise_exception(env, EXCP_UDEF, syn_uncategorized(), exception_target_el(env));
         return;
     }
+
     //creating a capability from metadata on the fly
     //important this should be done before switching PT as the host PT cannot be lost
     CCKey mkey=env->mkey;
     uint64_t tcr = env->tcr;
     uint64_t ptcr = env->ptcr;
-
     uint64_t MACval=0;
+
     //assuming TCR is updated for the call and resigning a capability
-    //TODO:
     if (!is_host_domain(env, PT)){
         if (is_MAC_violation(ptcr, perms_base, size, PT, MAC, mkey)){
             int syn = syn_data_abort_no_iss(arm_current_el(env) != 0, 0, 0, 0, 0, 1, 0x11);
@@ -2214,10 +2203,10 @@ void HELPER(csign)(CPUARMState *env, uint64_t crs_idx, uint64_t perms_base, uint
         
     }//creation of a capability for the first time
     else{
-        uint64_t ttbr = env->cp15.ttbr0_ns;
+        uint64_t ttbr0 = env->cp15.ttbr0_ns;
         //uint64_t ttbr = env->cp15.ttbr1_ns;
-        env->ccregs[crs_idx].PT=ttbr;
-        MACval=computeMAC(tcr, perms_base, ttbr, size, mkey);
+        env->ccregs[crs_idx].PT=ttbr0;
+        MACval=computeMAC(tcr, perms_base, ttbr0, size, mkey);
         env->ccregs[crs_idx].MAC=MACval;
     } 
     return;
@@ -2250,9 +2239,8 @@ void HELPER(cstg)(CPUARMState *env, uint64_t r_idx, uint64_t perms_base, uint32_
         //env->cc_access_flag=true;
         //these values are set to help page walker to identify cross-domain memory accesses 
         env->cc_access_pc=env->pc;
-        env->cc_access_ttbr=env->cp15.ttbr0_ns;
-        //env->cc_access_ttbr=env->cp15.ttbr1_ns;
-        env->cc_ttbr=PT;
+        env->cc_access_ttbr0=env->cp15.ttbr0_ns;
+        env->cc_ttbr0=PT;
         cpu_stq_data(env, addr, svalue);
         //env->cc_access_flag=false;
 
@@ -2287,9 +2275,8 @@ void HELPER(cldg)(CPUARMState *env, uint64_t r_idx, uint64_t perms_base, uint32_
             return;
         }
         env->cc_access_pc=env->pc;
-        env->cc_access_ttbr=env->cp15.ttbr0_ns;
-        //env->cc_access_ttbr=env->cp15.ttbr1_ns;
-        env->cc_ttbr=PT;
+        env->cc_access_ttbr0=env->cp15.ttbr0_ns;
+        env->cc_ttbr0=PT;
         lvalue = cpu_ldq_data(env, addr);
         env->xregs[r_idx] = lvalue;
     }

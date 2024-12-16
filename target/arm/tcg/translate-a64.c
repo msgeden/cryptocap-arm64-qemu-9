@@ -1668,7 +1668,6 @@ static bool trans_READTTBR(DisasContext *s, arg_READTTBR *a)
 static bool trans_READTCR(DisasContext *s, arg_READTCR *a)
 {
     tcg_gen_mov_i64(cpu_X[a->rs], cpu_tcr);
-    
     return true;
 }
 
@@ -1816,10 +1815,8 @@ static bool trans_CLDC(DisasContext *s, arg_CLDC *a)
  
     return true;
 }
-
 static bool trans_CCALL(DisasContext *s, arg_CCALL *a)
 {
-
     gen_helper_ccall(tcg_env);
 
     uint32_t syndrome = syn_aa64_svc(0);
@@ -1865,6 +1862,50 @@ static bool trans_CJMP(DisasContext *s, arg_CJMP *a)
     return true;
 }
 
+#define SYSCALL_ID_REG_IDX 7
+#define PCALL_ID 466
+#define PRET_ID 467
+static bool trans_PCALL(DisasContext *s, arg_PCALL *a)
+{
+    /*
+     * For SVC, HVC and SMC we advance the single-step state
+     * machine before taking the exception. This is architecturally
+     * mandated, to ensure that single-stepping a system call
+     * instruction works properly.
+     */
+    TCGv_i64 x8 = cpu_reg(s, 8);
+    tcg_gen_movi_i64(x8, PCALL_ID);  // Set x8 to desired syscall number
+    
+    uint32_t syndrome = syn_aa64_svc(0);
+    if (s->fgt_svc) {
+        gen_exception_insn_el(s, 0, EXCP_UDEF, syndrome, 2);
+        return true;
+    }
+    gen_ss_advance(s);
+    gen_exception_insn(s, 4, EXCP_SWI, syndrome);
+    return true;
+}
+
+static bool trans_PRET(DisasContext *s, arg_PRET *a)
+{
+    /*
+     * For SVC, HVC and SMC we advance the single-step state
+     * machine before taking the exception. This is architecturally
+     * mandated, to ensure that single-stepping a system call
+     * instruction works properly.
+     */
+    TCGv_i64 x8 = cpu_reg(s, 8);
+    tcg_gen_movi_i64(x8, PRET_ID);  // Set x8 to desired syscall number
+    
+    uint32_t syndrome = syn_aa64_svc(0);
+    if (s->fgt_svc) {
+        gen_exception_insn_el(s, 0, EXCP_UDEF, syndrome, 2);
+        return true;
+    }
+    gen_ss_advance(s);
+    gen_exception_insn(s, 4, EXCP_SWI, syndrome);
+    return true;
+}
 
 static bool trans_CLPC(DisasContext *s, arg_CLPC *a)
 {
