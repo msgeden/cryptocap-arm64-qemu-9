@@ -210,16 +210,9 @@ typedef struct ARMPACKey {
      uint64_t MAC;
      } ccapreg;
 typedef struct cdomreg {
-     uint64_t PC;
-     uint64_t SP;
-     uint64_t PT;
-     uint64_t MAC;
-     } cdomreg;
-typedef struct cprocessreg {
-     uint64_t PID;
-     uint64_t PC;
-     uint64_t MAC;
-     } cprocessreg;
+    uint64_t FIELD[3];
+    uint64_t MAC;
+} cdomreg;
 typedef struct CCKey {
     uint64_t lo, hi;
 } CCKey;
@@ -255,9 +248,7 @@ typedef struct CPUArchState {
     //link capability register for cret instruction
     cdomreg clr;
     //destination capability register for pcall instruction
-    cprocessreg cplc;
-    //link capability register for pret instruction
-    cprocessreg cplr;
+    cdomreg clp;
     //key register for MAC
     CCKey mkey;
     //key register for encryption/decryption 

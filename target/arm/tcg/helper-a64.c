@@ -2104,6 +2104,27 @@ static uint64_t qarma_mac(uint64_t data1, uint64_t data2,  uint64_t data3,  uint
     return mac;
 }
 
+
+static uint64_t qarma_mac64(uint64_t data1, uint64_t data2,  uint64_t data3,  uint64_t data4, CCKey key)
+{
+    uint64_t mac = 0;  // Initialization vector
+    
+    // First block
+    mac = qarma_block_encrypt(data1 ^ mac, key);
+    
+    // Second block
+    mac = qarma_block_encrypt(data2 ^ mac, key);
+
+    // Third block
+    mac = qarma_block_encrypt(data3 ^ mac, key);
+    
+    // Fourth block
+    mac = qarma_block_encrypt(data4 ^ mac, key);
+    
+    return mac;
+}
+
+
 static uint64_t computeMAC(uint64_t tcr, uint64_t perms_base, uint64_t PT, uint32_t size, CCKey mkey){
     return qarma_mac(tcr, perms_base, PT, size, mkey);
 }
@@ -2172,6 +2193,20 @@ void HELPER(updckeys)(CPUARMState *env)
         raise_exception(env, EXCP_UDEF, syn_uncategorized(), exception_target_el(env));
         return;
     }
+}
+
+
+void HELPER(csigncl)(CPUARMState *env, uint64_t target_pid, uint64_t host_pid, uint64_t pc, uint64_t MAC)    
+{
+    // Check if the current exception level is appropriate (e.g., EL1 or higher)
+    if (!is_privileged_mode(env)) {
+        // Raise an exception if the privilege level is insufficient
+        raise_exception(env, EXCP_UDEF, syn_uncategorized(), exception_target_el(env));
+        return;
+    }
+    CCKey key=env->mkey;
+    env->clp.MAC=qarma_mac64(target_pid, host_pid, pc, 0, key);
+    return;
 }
 
 void HELPER(csign)(CPUARMState *env, uint64_t crs_idx, uint64_t perms_base, uint32_t size, uint64_t PT, uint64_t MAC)    
