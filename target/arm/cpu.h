@@ -201,18 +201,20 @@ typedef struct ARMPACKey {
 
 
 //#ifdef TARGET_CRYPTO_CAP
-//typedef struct __attribute__((packed)) ccapreg {
- typedef struct ccapreg {
+//typedef struct __attribute__((packed)) capreg {
+ typedef struct capreg {
      uint64_t perms_base;
      uint32_t offset;
      uint32_t size;
      uint64_t PT;
      uint64_t MAC;
-     } ccapreg;
-typedef struct cdomreg {
-    uint64_t FIELD[3];
-    uint64_t MAC;
-} cdomreg;
+     } capreg;
+typedef struct ccapreg {
+    uint64_t FIELD[4];
+} ccapreg;
+typedef struct dcapreg {
+    uint64_t FIELD[8];
+} dcapreg;
 typedef struct CCKey {
     uint64_t lo, hi;
 } CCKey;
@@ -242,13 +244,19 @@ typedef struct CPUArchState {
 
 //#ifdef TARGET_CRYPTO_CAP
     //8 x 256-bit capability registers.
-    ccapreg ccregs[CAPREG_SIZE];
+    capreg ccregs[CAPREG_SIZE];
     //destination capability register for ccall instruction
-    cdomreg clc;
+    ccapreg cclc;
     //link capability register for cret instruction
-    cdomreg clr;
+    ccapreg cclr;
     //destination capability register for pcall instruction
-    cdomreg clp;
+    ccapreg pclc;
+    //link capability register for pret instruction
+    ccapreg pclr;
+    //destination capability register for dcall instruction
+    dcapreg dclc;
+    //link capability register for dret instruction
+    dcapreg dclr;
     //key register for MAC
     CCKey mkey;
     //key register for encryption/decryption 

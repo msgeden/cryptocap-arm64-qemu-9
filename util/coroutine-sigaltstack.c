@@ -218,7 +218,7 @@ Coroutine *qemu_coroutine_new(void)
     sigfillset(&sigs);
     sigdelset(&sigs, SIGUSR2);
     while (!coTS->tr_called) {
-        sigsuspend(&sigs);
+            sigsuspend(&sigs);
     }
 
     /*

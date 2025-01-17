@@ -35,7 +35,7 @@
 &cc_r cc r
 &rw_cc_r rw cc r
 &idx_rw_cc_r idx rw cc r
-
+&cc cc
 
 #OPERATION TYPES
 @op_imm_crd_rs          ... .... ..... ..... .. imm:3 crd:5 rs:5 &imm_crd_rs
@@ -49,9 +49,9 @@
 @op_crs                 ... .... ..... ..... ..... ..... crs:5 &crs
 @op_imm_rs1_rs2         ... .... ..... ..... .... imm:1 rs1:5 rs2:5 &imm_rs1_rs2
 @op_nill                ... .... ..... ..... ..... ..... ..... &nill
-@op_cc_r                ... .... ..... ..... ..... .... cc:1 r:5 &cc_r
-@op_rw_cc_r             ... .... ..... ..... ..... ... rw:1 cc:1 r:5 &rw_cc_r
-@op_idx_rw_cc_r             ... .... ..... ..... ..... idx:2 rw:1 cc:2 r:5 &idx_rw_cc_r
+@op_cc_r                ... .... ..... ..... ..... .. cc:3 r:5 &cc_r
+@op_idx_rw_cc_r         ... .... ..... ..... ...  idx:3 rw:1 cc:3 r:5 &idx_rw_cc_r
+@op_cc                  ... .... ..... ..... ..... ..... .. cc:3 &cc
 
 
 #CAPABILITY MANIPULATION INSTRUCTIONS
@@ -67,7 +67,6 @@ CSIGN       000 0001 01001 00000 00000 00000 .....  @op_crs
 CSETPT      000 0001 10100 00000 ..... ..... .....  @op_crd_crs_rs
 
 
-
 #OTHER INSTRUCTIONS
 READTCR     000 0001 01010 00000 00000 00000 .....  @op_rs
 UPDTCR      000 0001 01011 00000 00000 00000 .....  @op_rs
@@ -81,7 +80,6 @@ READTTBR    000 0001 10011 00000 00000 0000 . .....  @op_imm_rs
 READCKEYS   000 0001 10001 00000 0000 . ..... .....  @op_imm_rs1_rs2
 UPDCKEYS    000 0001 10010 00000 0000 . ..... .....  @op_imm_rs1_rs2
 
-
 #MEMORY INSTRUCTIONS
 #intra-domain capability load/store
 LDC         000 0001 00000 ........ .. ..... .....  @op_imm_idx_cr_r
@@ -94,25 +92,18 @@ CLDC        000 0001 00100 ........ .. ..... .....  @op_imm_idx_crd_crs
 
 #DOMAIN SWITCH INSTRUCTIONS
 #EL0 -> EL1
-CCALL       000 0001 01101 00000 00000 00000 .....  @op_rs
+CCALL       000 0001 01101 00000 00000 00000 00000  @op_nill
 CRET        000 0001 01110 00000 00000 00000 00000  @op_nill
 #EL1 -> EL0
 CJMP        000 0001 10101 00000 00000 00000 00000  @op_nill
 
-#CLPC        000 0001 10110 00000 00000 000 . . ..... @op_rw_cc_r
-#CLSP        000 0001 10111 00000 00000 000 . . ..... @op_rw_cc_r
-#CLPT        000 0001 11000 00000 00000 000 . . ..... @op_rw_cc_r
-#CLMAC       000 0001 11011 00000 00000 000 . . ..... @op_rw_cc_r
-#LDCL        000 0001 11001 00000 00000 0000 . ..... @op_cc_r
-#STCL        000 0001 11010 00000 00000 0000 . ..... @op_cc_r
 READSPEL1   000 0001 11100 00000 00000 00000 .....  @op_rs
 
-CMOVCL      000 0001 10110 00000 00000 .. . .. ..... @op_idx_rw_cc_r
-CSIGNCL     000 0001 10111 00000 00000 00000 00000  @op_nill
-CLDCL       000 0001 11001 00000 00000 0000 . ..... @op_cc_r
-CSTCL       000 0001 11010 00000 00000 0000 . ..... @op_cc_r
-
+CMOVCL      000 0001 10110 00000 000 ... . ... ..... @op_idx_rw_cc_r
+CSIGNCL     000 0001 10111 00000 00000 00000 00 ...  @op_cc
+CLDCL       000 0001 11001 00000 00000 00 ... ..... @op_cc_r
+CSTCL       000 0001 11010 00000 00000 00 ... ..... @op_cc_r
 
 #EL0 -> EL1 with predefined SYCALL_ID
-PCALL       000 0001 11101 00000 00000 00000 00000  @op_nill
-PRET        000 0001 11110 00000 00000 00000 00000  @op_nill
+DCALL       000 0001 11101 00000 00000 00000 00000  @op_nill
+DRET        000 0001 11110 00000 00000 00000 00000  @op_nill

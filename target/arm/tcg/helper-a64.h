@@ -144,4 +144,7 @@ DEF_HELPER_1(updckeys, void, env)
 DEF_HELPER_1(ccall, void, env)
 DEF_HELPER_1(cret, void, env)
 DEF_HELPER_1(cjmp, void, env)
+//DEF_HELPER_1(dcall, void, env)
+DEF_HELPER_9(dcall, void, env, i64, i64, i64, i64, i64, i64, i64, i64)
+DEF_HELPER_1(dret, void, env)
 // //endif

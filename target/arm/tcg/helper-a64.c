@@ -2205,7 +2205,7 @@ void HELPER(csigncl)(CPUARMState *env, uint64_t target_pid, uint64_t host_pid, u
         return;
     }
     CCKey key=env->mkey;
-    env->clp.MAC=qarma_mac64(target_pid, host_pid, pc, 0, key);
+    env->pclc.FIELD[3]=qarma_mac64(target_pid, host_pid, pc, 0, key);
     return;
 }
 
@@ -2407,6 +2407,7 @@ void HELPER(cldc)(CPUARMState *env, uint64_t crd_idx, uint64_t perms_base, uint3
 void HELPER(ccall)(CPUARMState *env)
 {
     CPUARMState* state=env;
+    arm_rebuild_hflags(env);
     return;
 }
     
@@ -2419,6 +2420,59 @@ void HELPER(cret)(CPUARMState *env)
 void HELPER(cjmp)(CPUARMState *env)
 {
     CPUARMState* state=env;
+    return;
+}
+//void HELPER(dcall)(CPUARMState *env)
+//{
+void HELPER(dcall)(CPUARMState *env, uint64_t pc, uint64_t sp, uint64_t ttbr0, uint64_t ttbr1, uint64_t task_struct, uint64_t pstate, uint64_t tpidr, uint64_t tpidrro)
+{
+    CPUARMState* state=env;
+    //restore existing values to link capability register
+    //env->dclr.FIELD[0]=env->pc+4;
+    env->dclr.FIELD[1]=env->sp_el[0];
+    env->dclr.FIELD[2]=env->cp15.ttbr0_ns;
+    env->dclr.FIELD[3]=env->cp15.ttbr1_ns;
+    env->dclr.FIELD[4]=env->cp15.tpidr_el[1];
+    env->dclr.FIELD[5]=env->pstate;
+    env->dclr.FIELD[6]=env->cp15.tpidr_el[0];
+    env->dclr.FIELD[7]=env->cp15.tpidrro_el[0];
+
+    //update
+    env->pc=pc;
+    env->sp_el[0]=sp;
+    env->cp15.ttbr0_ns=ttbr0;
+    env->cp15.ttbr1_ns=ttbr1;
+    //callee's task_struct for Linux patched for the swap of tpidr_el1-sp_el0 
+    env->cp15.tpidr_el[1]=task_struct;
+    env->pstate=pstate;
+    env->cp15.tpidr_el[0]=tpidr;
+    env->cp15.tpidrro_el[0]=tpidrro;
+
+    //TEMPORARY
+    //env->sp_el[1]=tpidrro;
+    //env->cp15.tpidrro_el[0]=0;
+
+    /* Clear instruction prefetch */
+    //tlb_flush(env_cpu(env));
+    /* Handle CPU specific branch requirements */
+    arm_rebuild_hflags(env);
+    return;
+}
+    
+void HELPER(dret)(CPUARMState *env)
+{
+    CPUARMState* state=env;
+    env->pc=env->dclr.FIELD[0];
+    env->sp_el[0]=env->dclr.FIELD[1];
+    env->cp15.ttbr0_ns=env->dclr.FIELD[2];
+    env->cp15.ttbr1_ns=env->dclr.FIELD[3];
+    //callee's task_struct for Linux patched for the swap of tpidr_el1-sp_el0 
+    env->cp15.tpidr_el[1]=env->dclr.FIELD[4];
+    env->pstate=env->dclr.FIELD[5];
+    env->cp15.tpidr_el[0]=env->dclr.FIELD[6];
+    env->cp15.tpidrro_el[0]=env->dclr.FIELD[7];
+    arm_rebuild_hflags(env);
+
     return;
 }
 //#endif

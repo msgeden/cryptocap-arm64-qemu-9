@@ -1087,10 +1087,12 @@ static void aarch64_cpu_dump_state(CPUState *cs, FILE *f, int flags)
         ((uint16_t)(env->ccregs[i].perms_base >> 48) & 0xFFFF), (env->ccregs[i].perms_base & 0xFFFFFFFFFFFF), env->ccregs[i].offset, env->ccregs[i].size, env->ccregs[i].PT, env->ccregs[i].MAC,
         "\n");
     }
-    qemu_fprintf(f, "CLC.PC=%016" PRIx64 ":.SP=%016" PRIx64 ":.PT=%016" PRIx64 ":.MAC=%016" PRIx64 "%s", env->clc.FIELD[0], env->clc.FIELD[1], env->clc.FIELD[2], env->clc.MAC, "\n");  
-    qemu_fprintf(f, "CLR.PC=%016" PRIx64 ":.SP=%016" PRIx64 ":.PT=%016" PRIx64 ":.MAC=%016" PRIx64 "%s", env->clr.FIELD[0], env->clr.FIELD[1], env->clr.FIELD[2], env->clr.MAC, "\n");  
-    qemu_fprintf(f, "CLP.TARGET=%016" PRIx64 ":.HOST=%016" PRIx64 ":.PC=%016" PRIx64 ":.MAC=%016" PRIx64 "%s", env->clp.FIELD[0], env->clp.FIELD[1], env->clp.FIELD[2], env->clp.MAC, "\n");  
-    
+    qemu_fprintf(f, "CCLC.PC=%016" PRIx64 ":.SP=%016" PRIx64 ":.PT=%016" PRIx64 ":.MAC=%016" PRIx64 "%s", env->cclc.FIELD[0], env->cclc.FIELD[1], env->cclc.FIELD[2], env->cclc.FIELD[3], "\n");  
+    qemu_fprintf(f, "CCLR.PC=%016" PRIx64 ":.SP=%016" PRIx64 ":.PT=%016" PRIx64 ":.MAC=%016" PRIx64 "%s", env->cclr.FIELD[0], env->cclr.FIELD[1], env->cclr.FIELD[2], env->cclr.FIELD[3], "\n");  
+    qemu_fprintf(f, "PCLC.TARGET=%016" PRIx64 ":.HOST=%016" PRIx64 ":.PC=%016" PRIx64 ":.MAC=%016" PRIx64 "%s", env->pclc.FIELD[0], env->pclc.FIELD[1], env->pclc.FIELD[2], env->pclc.FIELD[3], "\n");  
+    qemu_fprintf(f, "PCLR.TARGET=%016" PRIx64 ":.HOST=%016" PRIx64 ":.PC=%016" PRIx64 ":.MAC=%016" PRIx64 "%s", env->pclr.FIELD[0], env->pclr.FIELD[1], env->pclr.FIELD[2], env->pclr.FIELD[3], "\n");  
+    qemu_fprintf(f, "DCLC.FIELD[0]=%016" PRIx64 ":.FIELD[1]=%016" PRIx64 ":.FIELD[2]=%016" PRIx64 ":.FIELD[3]=%016" PRIx64 ":.FIELD[4]=%016" PRIx64 ":.FIELD[5]=%016" PRIx64 ":.FIELD[6]=%016" PRIx64 ":.FIELD[7]=%016" PRIx64 ":.MAC=%016" PRIx64  "%s", env->dclc.FIELD[0], env->dclc.FIELD[1], env->dclc.FIELD[2], env->dclc.FIELD[3], env->dclc.FIELD[4], env->dclc.FIELD[5], env->dclc.FIELD[6], env->dclc.FIELD[7], env->dclc.FIELD[8],"\n");  
+    qemu_fprintf(f, "DCLR.FIELD[0]=%016" PRIx64 ":.FIELD[1]=%016" PRIx64 ":.FIELD[2]=%016" PRIx64 ":.FIELD[3]=%016" PRIx64 ":.FIELD[4]=%016" PRIx64 ":.FIELD[5]=%016" PRIx64 ":.FIELD[6]=%016" PRIx64 ":.FIELD[7]=%016" PRIx64 ":.MAC=%016" PRIx64  "%s", env->dclr.FIELD[0], env->dclr.FIELD[1], env->dclr.FIELD[2], env->dclr.FIELD[3], env->dclr.FIELD[4], env->dclr.FIELD[5], env->dclr.FIELD[6], env->dclr.FIELD[7], env->dclr.FIELD[8],"\n");  
     qemu_fprintf(f, "TCR=%016" PRIx64 " PTCR=%016" PRIx64 " TTBR0_NS=%016" PRIx64 " TTBR1_NS=%016" PRIx64 " CC_TTBR=%016" PRIx64  "%s", env->tcr, env->ptcr, env->cp15.ttbr0_el[1], env->cp15.ttbr1_el[1], env->cc_ttbr0, "\n");  
     qemu_fprintf(f, "MKEY.lo=%016" PRIx64 ":.hi=%016" PRIx64 " EKEY.lo=%016" PRIx64 ":.hi=%016" PRIx64 "%s", env->mkey.lo, env->mkey.hi, env->ekey.lo, env->ekey.hi, "\n");  
 //#endif
