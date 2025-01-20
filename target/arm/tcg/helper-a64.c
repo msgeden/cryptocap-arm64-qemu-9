@@ -505,7 +505,11 @@ uint64_t HELPER(crc32c_64)(uint64_t acc, uint64_t val, uint32_t bytes)
     return crc32c(acc, buf, bytes) ^ 0xffffffff;
 }
 
-/*
+/*Bad owner or permissions on /root/.ssh/config
+fatal: Could not read from remote repository.
+
+Please make sure you have the correct access rights
+and the repository exists.
  * AdvSIMD half-precision
  */
 
@@ -2422,39 +2426,31 @@ void HELPER(cjmp)(CPUARMState *env)
     CPUARMState* state=env;
     return;
 }
-//void HELPER(dcall)(CPUARMState *env)
-//{
-void HELPER(dcall)(CPUARMState *env, uint64_t pc, uint64_t sp, uint64_t ttbr0, uint64_t ttbr1, uint64_t task_struct, uint64_t pstate, uint64_t tpidr, uint64_t tpidrro)
+
+void HELPER(dcall)(CPUARMState *env, uint64_t curr_pc)
 {
     CPUARMState* state=env;
     //restore existing values to link capability register
-    //env->dclr.FIELD[0]=env->pc+4;
-    env->dclr.FIELD[1]=env->sp_el[0];
-    env->dclr.FIELD[2]=env->cp15.ttbr0_ns;
-    env->dclr.FIELD[3]=env->cp15.ttbr1_ns;
-    env->dclr.FIELD[4]=env->cp15.tpidr_el[1];
-    env->dclr.FIELD[5]=env->pstate;
-    env->dclr.FIELD[6]=env->cp15.tpidr_el[0];
-    env->dclr.FIELD[7]=env->cp15.tpidrro_el[0];
+    env->dclr.FIELD[0]=curr_pc+4; //save caller's return address
+    env->dclr.FIELD[1]=env->sp_el[0]; //save caller's SP
+    env->dclr.FIELD[2]=env->cp15.ttbr0_ns; //save caller's TTBR_EL1
+    env->dclr.FIELD[3]=env->cp15.ttbr1_ns; //save caller's TTBR1_EL1
+    env->dclr.FIELD[4]=env->cp15.tpidr_el[1]; //save caller's TPIDR_EL1 (caller task_struct in a patched Linux)
+    env->dclr.FIELD[5]=env->pstate; //save caller's existing pstate
+    env->dclr.FIELD[6]=env->cp15.tpidr_el[0]; //save caller's TPIDR_EL0
+    env->dclr.FIELD[7]=env->cp15.tpidrro_el[0]; //save caller's TPIDRRO_EL0
 
-    //update
-    env->pc=pc;
-    env->sp_el[0]=sp;
-    env->cp15.ttbr0_ns=ttbr0;
-    env->cp15.ttbr1_ns=ttbr1;
-    //callee's task_struct for Linux patched for the swap of tpidr_el1-sp_el0 
-    env->cp15.tpidr_el[1]=task_struct;
-    env->pstate=pstate;
-    env->cp15.tpidr_el[0]=tpidr;
-    env->cp15.tpidrro_el[0]=tpidrro;
+    //update target values using capability target register (DCLC)
+    env->pc=env->dclc.FIELD[0]; //set to callee PC
+    env->sp_el[0]=env->dclc.FIELD[1]; //set to callee SP
+    env->cp15.ttbr0_ns=env->dclc.FIELD[2]; //set to callee TTBR0_EL1
+    env->cp15.ttbr1_ns=env->dclc.FIELD[3]; //set to callee TTBR1_EL1
+    env->cp15.tpidr_el[1]=env->dclc.FIELD[4]; //set to callee TPIDR_EL1 (callee task_struct in a patched Linux) 
+    env->pstate=env->dclc.FIELD[5]; //set to callee pstate (SPSR_EL1)
+    env->cp15.tpidr_el[0]=env->dclc.FIELD[6]; //set to callee TPIDR_EL0
+    env->cp15.tpidrro_el[0]=env->dclc.FIELD[7]; //set to callee TPIDRRO_EL0
 
-    //TEMPORARY
-    //env->sp_el[1]=tpidrro;
-    //env->cp15.tpidrro_el[0]=0;
-
-    /* Clear instruction prefetch */
-    //tlb_flush(env_cpu(env));
-    /* Handle CPU specific branch requirements */
+    tlb_flush(env_cpu(env));
     arm_rebuild_hflags(env);
     return;
 }
@@ -2462,15 +2458,18 @@ void HELPER(dcall)(CPUARMState *env, uint64_t pc, uint64_t sp, uint64_t ttbr0, u
 void HELPER(dret)(CPUARMState *env)
 {
     CPUARMState* state=env;
-    env->pc=env->dclr.FIELD[0];
-    env->sp_el[0]=env->dclr.FIELD[1];
-    env->cp15.ttbr0_ns=env->dclr.FIELD[2];
-    env->cp15.ttbr1_ns=env->dclr.FIELD[3];
+    //update return values using capability link register (DCLR)
+    env->pc=env->dclr.FIELD[0]; //restore caller's PC 
+    env->sp_el[0]=env->dclr.FIELD[1]; //restore caller's SP
+    env->cp15.ttbr0_ns=env->dclr.FIELD[2]; //restore caller's TTBR0_EL1
+    env->cp15.ttbr1_ns=env->dclr.FIELD[3]; //restore caller's TTBR1_EL1
     //callee's task_struct for Linux patched for the swap of tpidr_el1-sp_el0 
-    env->cp15.tpidr_el[1]=env->dclr.FIELD[4];
-    env->pstate=env->dclr.FIELD[5];
-    env->cp15.tpidr_el[0]=env->dclr.FIELD[6];
-    env->cp15.tpidrro_el[0]=env->dclr.FIELD[7];
+    env->cp15.tpidr_el[1]=env->dclr.FIELD[4]; //restore caller's TPIDR_EL1 (caller task_struct in a patched Linux)
+    env->pstate=env->dclr.FIELD[5]; //restore caller's pstate
+    env->cp15.tpidr_el[0]=env->dclr.FIELD[6]; //restore TPIDR_EL0 
+    env->cp15.tpidrro_el[0]=env->dclr.FIELD[7]; //restpre TPIDRRO_EL0
+
+    tlb_flush(env_cpu(env));
     arm_rebuild_hflags(env);
 
     return;

@@ -213,7 +213,7 @@ typedef struct ccapreg {
     uint64_t FIELD[4];
 } ccapreg;
 typedef struct dcapreg {
-    uint64_t FIELD[8];
+    uint64_t FIELD[12];
 } dcapreg;
 typedef struct CCKey {
     uint64_t lo, hi;
