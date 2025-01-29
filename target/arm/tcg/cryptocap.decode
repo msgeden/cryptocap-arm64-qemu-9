@@ -21,7 +21,7 @@
 
 #FORMATS
 #format for capability manipulation instructions 
-&imm_crd_rs imm crd rs  
+&idx_rw_crd_rs idx rw crd rs  
 &crd_crs crd crs
 &crd_crs_rs crd crs rs      
 &imm_idx_cr_r imm idx cr r  
@@ -38,7 +38,7 @@
 &cc cc
 
 #OPERATION TYPES
-@op_imm_crd_rs          ... .... ..... ..... .. imm:3 crd:5 rs:5 &imm_crd_rs
+@op_idx_rw_crd_rs          ... .... ..... ..... . idx:3 rw:1 crd:5 rs:5 &idx_rw_crd_rs
 @op_crd_crs             ... .... ..... ..... ..... crd:5 crs:5 &crd_crs
 @op_crd_crs_rs          ... .... ..... ..... crd:5 crs:5 rs:5 &crd_crs_rs
 @op_imm_idx_cr_r        ... .... ..... imm:8 idx:2 cr:5 r:5 &imm_idx_cr_r
@@ -55,8 +55,8 @@
 
 
 #CAPABILITY MANIPULATION INSTRUCTIONS
-#a generic capability register manipulation instruction based on index (imm)
-CMANIP      000 0001 01111 00000 00 ... ..... ..... @op_imm_crd_rs
+#a generic capability register manipulation instruction based on index (idx)
+CMANIP      000 0001 01111 00000 0 ... . ..... ..... @op_idx_rw_crd_rs
 CMOV        000 0001 10000 00000 00000 ..... .....  @op_crd_crs
 CSETBASE    000 0001 00101 00000 ..... ..... .....  @op_crd_crs_rs
 CSETSIZE    000 0001 00110 00000 ..... ..... .....  @op_crd_crs_rs
@@ -89,6 +89,7 @@ CLDG        000 0001 00010 ........ .. ..... .....  @op_imm_idx_r_cr
 CSTG        000 0001 00011 ........ .. ..... .....  @op_imm_idx_r_cr
 #cross-domaion capability load
 CLDC        000 0001 00100 ........ .. ..... .....  @op_imm_idx_crd_crs
+
 
 #DOMAIN SWITCH INSTRUCTIONS
 #EL0 -> EL1

@@ -2144,6 +2144,9 @@ static bool is_bounds_violation(uint64_t base, uint32_t offset, uint32_t size){
 }
 
 static bool is_MAC_violation(uint64_t tcr, uint64_t perms_base, uint32_t size, uint64_t PT, uint64_t MAC, CCKey mkey){
+    //TODO: Remove later
+    if (MAC==0)
+        return false;
     uint64_t refMAC=computeMAC(tcr, perms_base, PT, size, mkey);
     return (MAC!=refMAC);
 }
@@ -2251,7 +2254,7 @@ void HELPER(csign)(CPUARMState *env, uint64_t crs_idx, uint64_t perms_base, uint
     return;
 }
 
-void HELPER(cstg)(CPUARMState *env, uint64_t r_idx, uint64_t perms_base, uint32_t offset, uint32_t size, uint64_t PT, uint64_t MAC)
+void HELPER(cstg)(CPUARMState *env, uint64_t size_idx, uint64_t r_idx, uint64_t perms_base, uint32_t offset, uint32_t size, uint64_t PT, uint64_t MAC)
 {
     uint64_t perms = (perms_base >> 48);  
     uint64_t base = (perms_base & 0x0000FFFFFFFFFFFF);  
@@ -2261,7 +2264,22 @@ void HELPER(cstg)(CPUARMState *env, uint64_t r_idx, uint64_t perms_base, uint32_
     CCKey mkey=env->mkey;
     //intra-domain access
     if (!is_cross_domain(env, PT)){
-        cpu_stq_data(env, addr, svalue); 
+        switch (size_idx){
+            case 0:
+                cpu_stq_data(env, addr, svalue);
+                break;
+            case 1:
+                cpu_stl_data(env, addr, svalue);
+                break;
+            case 2:
+                cpu_stw_data(env, addr, svalue);
+                break;
+            case 3:
+                cpu_stb_data(env, addr, svalue);
+                break;
+            default:
+                cpu_stq_data(env, addr, svalue);
+        }
         return;   
     }//cross-domain access
     else{    
@@ -2280,16 +2298,29 @@ void HELPER(cstg)(CPUARMState *env, uint64_t r_idx, uint64_t perms_base, uint32_
         env->cc_access_pc=env->pc;
         env->cc_access_ttbr0=env->cp15.ttbr0_ns;
         env->cc_ttbr0=PT;
-        cpu_stq_data(env, addr, svalue);
+        switch (size_idx){
+            case 0:
+                cpu_stq_data(env, addr, svalue);
+                break;
+            case 1:
+                cpu_stl_data(env, addr, svalue);
+                break;
+            case 2:
+                cpu_stw_data(env, addr, svalue);
+                break;
+            case 3:
+                cpu_stb_data(env, addr, svalue);
+                break;
+            default:
+                cpu_stq_data(env, addr, svalue);
+        }
         //env->cc_access_flag=false;
-
         return; 
-    
     }
     return;
 }
 
-void HELPER(cldg)(CPUARMState *env, uint64_t r_idx, uint64_t perms_base, uint32_t offset, uint32_t size, uint64_t PT, uint64_t MAC)
+void HELPER(cldg)(CPUARMState *env, uint64_t size_idx, uint64_t r_idx, uint64_t perms_base, uint32_t offset, uint32_t size, uint64_t PT, uint64_t MAC)
 {
     uint64_t perms = (perms_base >> 48);  
     uint64_t base = (perms_base & 0x0000FFFFFFFFFFFF);  
@@ -2299,7 +2330,22 @@ void HELPER(cldg)(CPUARMState *env, uint64_t r_idx, uint64_t perms_base, uint32_
     CCKey mkey=env->mkey;
     //intra-domain access
     if (!is_cross_domain(env, PT)){
-        lvalue = cpu_ldq_data(env, addr);
+        switch (size_idx){
+            case 0:
+                lvalue = cpu_ldq_data(env, addr);
+                break;
+            case 1:
+                lvalue = cpu_ldl_data(env, addr);
+                break;
+            case 2:
+                lvalue = cpu_lduw_data(env, addr);
+                break;
+            case 3:
+                lvalue = cpu_ldub_data(env, addr);
+                break;
+            default:
+                lvalue = cpu_ldq_data(env, addr);
+        }
         env->xregs[r_idx] = lvalue;
         return;   
     }//cross-domain access
@@ -2316,7 +2362,22 @@ void HELPER(cldg)(CPUARMState *env, uint64_t r_idx, uint64_t perms_base, uint32_
         env->cc_access_pc=env->pc;
         env->cc_access_ttbr0=env->cp15.ttbr0_ns;
         env->cc_ttbr0=PT;
-        lvalue = cpu_ldq_data(env, addr);
+        switch (size_idx){
+            case 0:
+                lvalue = cpu_ldq_data(env, addr);
+                break;
+            case 1:
+                lvalue = cpu_ldl_data(env, addr);
+                break;
+            case 2:
+                lvalue = cpu_lduw_data(env, addr);
+                break;
+            case 3:
+                lvalue = cpu_ldub_data(env, addr);
+                break;
+            default:
+                lvalue = cpu_ldq_data(env, addr);
+        }
         env->xregs[r_idx] = lvalue;
     }
     return;
@@ -2439,16 +2500,25 @@ void HELPER(dcall)(CPUARMState *env, uint64_t curr_pc)
     env->dclr.FIELD[5]=env->pstate; //save caller's existing pstate
     env->dclr.FIELD[6]=env->cp15.tpidr_el[0]; //save caller's TPIDR_EL0
     env->dclr.FIELD[7]=env->cp15.tpidrro_el[0]; //save caller's TPIDRRO_EL0
+    
+    env->dclr.FIELD[8]=env->cp15.tcr_el[1]; //save caller's TCR_EL1
+    env->dclr.FIELD[9]=env->cp15.sctlr_el[1]; //save caller's SCTLR_EL1
+    env->dclr.FIELD[10]=env->cp15.mair_el[1]; //save caller's MAIR_EL1
 
     //update target values using capability target register (DCLC)
     env->pc=env->dclc.FIELD[0]; //set to callee PC
     env->sp_el[0]=env->dclc.FIELD[1]; //set to callee SP
+    env->xregs[31]=env->dclc.FIELD[1]; //set to callee SP
     env->cp15.ttbr0_ns=env->dclc.FIELD[2]; //set to callee TTBR0_EL1
     env->cp15.ttbr1_ns=env->dclc.FIELD[3]; //set to callee TTBR1_EL1
     env->cp15.tpidr_el[1]=env->dclc.FIELD[4]; //set to callee TPIDR_EL1 (callee task_struct in a patched Linux) 
     env->pstate=env->dclc.FIELD[5]; //set to callee pstate (SPSR_EL1)
     env->cp15.tpidr_el[0]=env->dclc.FIELD[6]; //set to callee TPIDR_EL0
     env->cp15.tpidrro_el[0]=env->dclc.FIELD[7]; //set to callee TPIDRRO_EL0
+    
+    env->cp15.tcr_el[1]=env->dclc.FIELD[8]; //set to callee TCR_EL1
+    env->cp15.sctlr_el[1]=env->dclc.FIELD[9]; //set to callee SCTLR_EL1
+    env->cp15.mair_el[1]=env->dclc.FIELD[10]; //set to callee MAIR_EL1
 
     tlb_flush(env_cpu(env));
     arm_rebuild_hflags(env);
@@ -2467,7 +2537,11 @@ void HELPER(dret)(CPUARMState *env)
     env->cp15.tpidr_el[1]=env->dclr.FIELD[4]; //restore caller's TPIDR_EL1 (caller task_struct in a patched Linux)
     env->pstate=env->dclr.FIELD[5]; //restore caller's pstate
     env->cp15.tpidr_el[0]=env->dclr.FIELD[6]; //restore TPIDR_EL0 
-    env->cp15.tpidrro_el[0]=env->dclr.FIELD[7]; //restpre TPIDRRO_EL0
+    env->cp15.tpidrro_el[0]=env->dclr.FIELD[7]; //restore TPIDRRO_EL0
+
+    env->cp15.tcr_el[1]=env->dclr.FIELD[8]; //restore to callee TCR_EL1
+    env->cp15.sctlr_el[1]=env->dclr.FIELD[9]; //restore to callee SCTLR_EL1
+    env->cp15.mair_el[1]=env->dclr.FIELD[10]; //restore to callee MAIR_EL1
 
     tlb_flush(env_cpu(env));
     arm_rebuild_hflags(env);
