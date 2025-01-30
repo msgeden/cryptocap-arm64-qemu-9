@@ -36,9 +36,10 @@
 &rw_cc_r rw cc r
 &idx_rw_cc_r idx rw cc r
 &cc cc
+&crd_rs1_rs2 crd rs1 rs2  
 
 #OPERATION TYPES
-@op_idx_rw_crd_rs          ... .... ..... ..... . idx:3 rw:1 crd:5 rs:5 &idx_rw_crd_rs
+@op_idx_rw_crd_rs       ... .... ..... ..... . idx:3 rw:1 crd:5 rs:5 &idx_rw_crd_rs
 @op_crd_crs             ... .... ..... ..... ..... crd:5 crs:5 &crd_crs
 @op_crd_crs_rs          ... .... ..... ..... crd:5 crs:5 rs:5 &crd_crs_rs
 @op_imm_idx_cr_r        ... .... ..... imm:8 idx:2 cr:5 r:5 &imm_idx_cr_r
@@ -52,6 +53,7 @@
 @op_cc_r                ... .... ..... ..... ..... .. cc:3 r:5 &cc_r
 @op_idx_rw_cc_r         ... .... ..... ..... ..  idx:4 rw:1 cc:3 r:5 &idx_rw_cc_r
 @op_cc                  ... .... ..... ..... ..... ..... .. cc:3 &cc
+@op_crd_rs1_rs2         ... .... ..... ..... crd:5 rs1:5 rs2:5 &crd_rs1_rs2
 
 
 #CAPABILITY MANIPULATION INSTRUCTIONS
@@ -64,7 +66,8 @@ CSETPERMS   000 0001 00111 00000 ..... ..... .....  @op_crd_crs_rs
 CSETADDR    000 0001 01000 00000 ..... ..... .....  @op_crd_crs_rs
 CSIGN       000 0001 01001 00000 00000 00000 .....  @op_crs
 #this is an illegal/temporary user instruction placed for debug purposes, which will require EL1 privileges later.
-CSETPT      000 0001 10100 00000 ..... ..... .....  @op_crd_crs_rs
+#CSETPT      000 0001 10100 00000 ..... ..... .....  @op_crd_crs_rs
+CCREATE      000 0001 10100 00000 ..... ..... .....  @op_crd_rs1_rs2
 
 
 #OTHER INSTRUCTIONS

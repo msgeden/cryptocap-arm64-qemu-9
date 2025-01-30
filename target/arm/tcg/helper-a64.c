@@ -2216,6 +2216,44 @@ void HELPER(csigncl)(CPUARMState *env, uint64_t target_pid, uint64_t host_pid, u
     return;
 }
 
+// void HELPER(csign)(CPUARMState *env, uint64_t crs_idx, uint64_t perms_base, uint32_t size, uint64_t PT, uint64_t MAC)    
+// {
+//     // Check if the current exception level is appropriate (e.g., EL1 or higher)
+//     if (!is_privileged_mode(env)) {
+//         // Raise an exception if the privilege level is insufficient
+//         raise_exception(env, EXCP_UDEF, syn_uncategorized(), exception_target_el(env));
+//         return;
+//     }
+
+//     //creating a capability from metadata on the fly
+//     //important this should be done before switching PT as the host PT cannot be lost
+//     CCKey mkey=env->mkey;
+//     uint64_t tcr = env->tcr;
+//     uint64_t ptcr = env->ptcr;
+//     uint64_t MACval=0;
+
+//     //assuming TCR is updated for the call and resigning a capability
+//     if (!is_host_domain(env, PT)){
+//         if (is_MAC_violation(ptcr, perms_base, size, PT, MAC, mkey)){
+//             int syn = syn_data_abort_no_iss(arm_current_el(env) != 0, 0, 0, 0, 0, 1, 0x11);
+//             raise_exception_ra(env, EXCP_DATA_ABORT, syn,
+//                             exception_target_el(env), GETPC());
+//             return;
+//         }
+//         MACval=computeMAC(tcr, perms_base, PT, size, mkey);
+//         env->ccregs[crs_idx].MAC=MACval;
+        
+//     }//creation of a capability for the first time
+//     else{
+//         uint64_t ttbr0 = env->cp15.ttbr0_ns;
+//         //uint64_t ttbr = env->cp15.ttbr1_ns;
+//         env->ccregs[crs_idx].PT=ttbr0;
+//         MACval=computeMAC(tcr, perms_base, ttbr0, size, mkey);
+//         env->ccregs[crs_idx].MAC=MACval;
+//     } 
+//     return;
+// }
+
 void HELPER(csign)(CPUARMState *env, uint64_t crs_idx, uint64_t perms_base, uint32_t size, uint64_t PT, uint64_t MAC)    
 {
     // Check if the current exception level is appropriate (e.g., EL1 or higher)
@@ -2254,12 +2292,56 @@ void HELPER(csign)(CPUARMState *env, uint64_t crs_idx, uint64_t perms_base, uint
     return;
 }
 
+
+void HELPER(ccreate)(CPUARMState *env, uint64_t crd_idx, uint64_t perms_base, uint64_t offset_size)    
+{
+    CCKey mkey=env->mkey;
+    uint64_t PT=env->cp15.ttbr0_ns;
+    //uint64_t tcr = env->tcr;
+    uint64_t tcr = 0;
+    //uint64_t tcr = env->cp15.ttbr0_ns;
+    uint32_t offset= (uint32_t)offset_size;
+    uint32_t size= (uint32_t)(offset_size>>32);
+    uint64_t MACval=computeMAC(tcr, perms_base, PT, size, mkey);
+    env->ccregs[crd_idx].perms_base=perms_base;
+    env->ccregs[crd_idx].offset=offset;
+    env->ccregs[crd_idx].size=size;
+    env->ccregs[crd_idx].PT=PT;
+    env->ccregs[crd_idx].MAC=MACval;
+    return;
+}
+void HELPER(stc)(CPUARMState *env, uint64_t cr_idx, uint64_t perms_base, uint32_t size, uint64_t PT)
+{
+    CCKey mkey=env->mkey;
+    //uint64_t tcr = env->tcr;
+    uint64_t tcr = 0;
+    //uint64_t tcr = env->cp15.ttbr0_ns;
+    uint64_t MACval=computeMAC(tcr, perms_base, PT, size, mkey);
+    env->ccregs[cr_idx].MAC=MACval;
+    return;
+}
+void HELPER(ldc)(CPUARMState *env, uint64_t perms_base, uint32_t size, uint64_t PT, uint64_t MAC)
+{
+    CCKey mkey=env->mkey;
+    //uint64_t tcr = env->tcr;
+    uint64_t tcr = 0;
+    //uint64_t tcr = env->cp15.ttbr0_ns;
+    uint64_t refMAC=computeMAC(tcr, perms_base, PT, size, mkey);
+    if (refMAC!=MAC){
+        int syn = syn_data_abort_no_iss(arm_current_el(env) != 0, 0, 0, 0, 0, 0, 0x11);
+        raise_exception_ra(env, EXCP_DATA_ABORT, syn, exception_target_el(env), GETPC());
+    }
+    return;
+}
+
 void HELPER(cstg)(CPUARMState *env, uint64_t size_idx, uint64_t r_idx, uint64_t perms_base, uint32_t offset, uint32_t size, uint64_t PT, uint64_t MAC)
 {
     uint64_t perms = (perms_base >> 48);  
     uint64_t base = (perms_base & 0x0000FFFFFFFFFFFF);  
     uint64_t addr= base+(uint64_t)offset;
-    uint64_t tcr = env->tcr; 
+    //uint64_t tcr = env->tcr;
+    uint64_t tcr = 0;
+    //uint64_t tcr = env->cp15.ttbr0_ns;
     uint64_t svalue=env->xregs[r_idx];
     CCKey mkey=env->mkey;
     //intra-domain access
@@ -2284,7 +2366,8 @@ void HELPER(cstg)(CPUARMState *env, uint64_t size_idx, uint64_t r_idx, uint64_t 
     }//cross-domain access
     else{    
         //check permissions and bounds
-        if (is_MAC_violation(tcr, perms_base, size, PT, MAC, mkey) ||
+        if (
+            //is_MAC_violation(tcr, perms_base, size, PT, MAC, mkey) ||
             is_perms_violation(perms, WRITE) ||
             is_bounds_violation(base, offset, size)) {
             int syn = syn_data_abort_no_iss(arm_current_el(env) != 0, 0, 0, 0, 0, 1, 0x11);
@@ -2325,7 +2408,9 @@ void HELPER(cldg)(CPUARMState *env, uint64_t size_idx, uint64_t r_idx, uint64_t 
     uint64_t perms = (perms_base >> 48);  
     uint64_t base = (perms_base & 0x0000FFFFFFFFFFFF);  
     uint64_t addr= base+(uint64_t)offset;
-    uint64_t tcr = env->tcr; 
+    //uint64_t tcr = env->tcr;
+    uint64_t tcr = 0;
+    //uint64_t tcr = env->cp15.ttbr0_ns;
     uint64_t lvalue=0;
     CCKey mkey=env->mkey;
     //intra-domain access
@@ -2351,7 +2436,8 @@ void HELPER(cldg)(CPUARMState *env, uint64_t size_idx, uint64_t r_idx, uint64_t 
     }//cross-domain access
     else{    
        //check permissions and bounds
-        if (is_MAC_violation(tcr, perms_base, size, PT, MAC, mkey) ||
+        if (
+            //is_MAC_violation(tcr, perms_base, size, PT, MAC, mkey) ||
             is_perms_violation(perms, READ) || 
             is_bounds_violation(base, offset, size)) {
             int syn = syn_data_abort_no_iss(arm_current_el(env) != 0, 0, 0, 0, 0, 0, 0x11);
@@ -2388,7 +2474,9 @@ void HELPER(cldc)(CPUARMState *env, uint64_t crd_idx, uint64_t perms_base, uint3
     uint64_t perms = (perms_base >> 48);  
     uint64_t base = (perms_base & 0x0000FFFFFFFFFFFF);  
     uint64_t addr= base+(uint64_t)offset;
-    uint64_t tcr = env->tcr; 
+    //uint64_t tcr = env->tcr;
+    uint64_t tcr = 0;
+    //uint64_t tcr = env->cp15.ttbr0_ns;
     uint64_t dest_perms_base=0;
     uint32_t dest_offset=0;
     uint32_t dest_size=0;
@@ -2428,7 +2516,8 @@ void HELPER(cldc)(CPUARMState *env, uint64_t crd_idx, uint64_t perms_base, uint3
     }//cross-domain access
     else{    
         //check permissions and bounds
-        if (is_MAC_violation(tcr, perms_base, size, PT, MAC, mkey) ||
+        if (
+            //is_MAC_violation(tcr, perms_base, size, PT, MAC, mkey) ||
             is_perms_violation(perms, READ) || 
             is_bounds_violation(base, offset, size)) {
             int syn = syn_data_abort_no_iss(arm_current_el(env) != 0, 0, 0, 0, 0, 0, 0x11);
@@ -2516,9 +2605,9 @@ void HELPER(dcall)(CPUARMState *env, uint64_t curr_pc)
     env->cp15.tpidr_el[0]=env->dclc.FIELD[6]; //set to callee TPIDR_EL0
     env->cp15.tpidrro_el[0]=env->dclc.FIELD[7]; //set to callee TPIDRRO_EL0
     
-    env->cp15.tcr_el[1]=env->dclc.FIELD[8]; //set to callee TCR_EL1
-    env->cp15.sctlr_el[1]=env->dclc.FIELD[9]; //set to callee SCTLR_EL1
-    env->cp15.mair_el[1]=env->dclc.FIELD[10]; //set to callee MAIR_EL1
+    // env->cp15.tcr_el[1]=env->dclc.FIELD[8]; //set to callee TCR_EL1
+    // env->cp15.sctlr_el[1]=env->dclc.FIELD[9]; //set to callee SCTLR_EL1
+    // env->cp15.mair_el[1]=env->dclc.FIELD[10]; //set to callee MAIR_EL1
 
     tlb_flush(env_cpu(env));
     arm_rebuild_hflags(env);
@@ -2539,9 +2628,9 @@ void HELPER(dret)(CPUARMState *env)
     env->cp15.tpidr_el[0]=env->dclr.FIELD[6]; //restore TPIDR_EL0 
     env->cp15.tpidrro_el[0]=env->dclr.FIELD[7]; //restore TPIDRRO_EL0
 
-    env->cp15.tcr_el[1]=env->dclr.FIELD[8]; //restore to callee TCR_EL1
-    env->cp15.sctlr_el[1]=env->dclr.FIELD[9]; //restore to callee SCTLR_EL1
-    env->cp15.mair_el[1]=env->dclr.FIELD[10]; //restore to callee MAIR_EL1
+    // env->cp15.tcr_el[1]=env->dclr.FIELD[8]; //restore to callee TCR_EL1
+    // env->cp15.sctlr_el[1]=env->dclr.FIELD[9]; //restore to callee SCTLR_EL1
+    // env->cp15.mair_el[1]=env->dclr.FIELD[10]; //restore to callee MAIR_EL1
 
     tlb_flush(env_cpu(env));
     arm_rebuild_hflags(env);

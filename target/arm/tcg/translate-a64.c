@@ -1685,20 +1685,30 @@ static bool trans_CSETADDR(DisasContext *s, arg_CSETADDR *a)
 }
 
 
-static bool trans_CSETPT(DisasContext *s, arg_CSETPT *a)
-{
-
-    //replace PT field
-    tcg_gen_mov_i64(cpu_CC[a->crd].PT, cpu_X[a->rs]);
-
-    // take other fields from CRs 
-    tcg_gen_mov_i64(cpu_CC[a->crd].perms_base, cpu_CC[a->crs].perms_base);
-    tcg_gen_mov_i32(cpu_CC[a->crd].offset, cpu_CC[a->crs].offset);
-    tcg_gen_mov_i32(cpu_CC[a->crd].size, cpu_CC[a->crs].size);
-    tcg_gen_mov_i64(cpu_CC[a->crd].MAC, cpu_CC[a->crs].MAC);
+static bool trans_CCREATE(DisasContext *s, arg_CCREATE *a)
+{   
+    TCGv_i64 Rs_perms_base = cpu_X[a->rs1];
+    TCGv_i64 Rs_offset_size = cpu_X[a->rs2];
+    TCGv_i64 crd_idx = tcg_temp_new_i64();
+    tcg_gen_movi_i64(crd_idx, a->crd);
+    
+    gen_helper_ccreate(tcg_env, crd_idx, Rs_perms_base, Rs_offset_size);
 
     return true;
 }
+
+// static bool trans_CSETPT(DisasContext *s, arg_CSETPT *a)
+// {
+//     //replace PT field
+//     tcg_gen_mov_i64(cpu_CC[a->crd].PT, cpu_X[a->rs]);
+
+//     // take other fields from CRs 
+//     tcg_gen_mov_i64(cpu_CC[a->crd].perms_base, cpu_CC[a->crs].perms_base);
+//     tcg_gen_mov_i32(cpu_CC[a->crd].offset, cpu_CC[a->crs].offset);
+//     tcg_gen_mov_i32(cpu_CC[a->crd].size, cpu_CC[a->crs].size);
+//     tcg_gen_mov_i64(cpu_CC[a->crd].MAC, cpu_CC[a->crs].MAC);
+//     return true;
+// }
 
 static bool trans_CSIGN(DisasContext *s, arg_CSIGN *a)
 {
@@ -1786,36 +1796,39 @@ static bool trans_LDC(DisasContext *s, arg_LDC *a)
     TCGv_i64 addr = tcg_temp_new_i64();
     tcg_gen_mov_i64(addr, cpu_reg(s, a->r));
   
-    TCGv_i64 tmp1 = tcg_temp_new_i64();
-    TCGv_i32 tmp2 = tcg_temp_new_i32();
-    TCGv_i32 tmp3 = tcg_temp_new_i32();
-    TCGv_i64 tmp4 = tcg_temp_new_i64();
-    TCGv_i64 tmp5 = tcg_temp_new_i64();
+    TCGv_i64 perms_base = tcg_temp_new_i64();
+    TCGv_i32 offset = tcg_temp_new_i32();
+    TCGv_i32 size = tcg_temp_new_i32();
+    TCGv_i64 PT = tcg_temp_new_i64();
+    TCGv_i64 MAC = tcg_temp_new_i64();
 
     //perms_base
-    tcg_gen_qemu_ld_i64(tmp1, addr, get_mem_index(s), MO_64);
-    tcg_gen_st_i64(tmp1, tcg_env, offsetof(CPUARMState, ccregs[a->cr].perms_base));
+    tcg_gen_qemu_ld_i64(perms_base, addr, get_mem_index(s), MO_64);
+    tcg_gen_st_i64(perms_base, tcg_env, offsetof(CPUARMState, ccregs[a->cr].perms_base));
     tcg_gen_addi_i64(addr, addr, 8);
     
     //offset
-    tcg_gen_qemu_ld_i32(tmp2, addr, get_mem_index(s), MO_32);
-    tcg_gen_st_i32(tmp2, tcg_env, offsetof(CPUARMState, ccregs[a->cr].offset));
+    tcg_gen_qemu_ld_i32(offset, addr, get_mem_index(s), MO_32);
+    tcg_gen_st_i32(offset, tcg_env, offsetof(CPUARMState, ccregs[a->cr].offset));
     tcg_gen_addi_i64(addr, addr, 4);
     
     //size
-    tcg_gen_qemu_ld_i32(tmp3, addr, get_mem_index(s), MO_32);
-    tcg_gen_st_i32(tmp3, tcg_env, offsetof(CPUARMState, ccregs[a->cr].size));
+    tcg_gen_qemu_ld_i32(size, addr, get_mem_index(s), MO_32);
+    tcg_gen_st_i32(size, tcg_env, offsetof(CPUARMState, ccregs[a->cr].size));
     tcg_gen_addi_i64(addr, addr, 4);
     
     //PT
-    tcg_gen_qemu_ld_i64(tmp4, addr, get_mem_index(s), MO_64);
-    tcg_gen_st_i64(tmp4, tcg_env, offsetof(CPUARMState, ccregs[a->cr].PT));
+    tcg_gen_qemu_ld_i64(PT, addr, get_mem_index(s), MO_64);
+    tcg_gen_st_i64(PT, tcg_env, offsetof(CPUARMState, ccregs[a->cr].PT));
     tcg_gen_addi_i64(addr, addr, 8);
     
     //MAC
-    tcg_gen_qemu_ld_i64(tmp5, addr, get_mem_index(s), MO_64);
-    tcg_gen_st_i64(tmp5, tcg_env, offsetof(CPUARMState, ccregs[a->cr].MAC));
-    
+    tcg_gen_qemu_ld_i64(MAC, addr, get_mem_index(s), MO_64);
+    tcg_gen_st_i64(MAC, tcg_env, offsetof(CPUARMState, ccregs[a->cr].MAC));
+
+    //assert(cr.MAC==MAC(cr.perms_base,cr.offset,cr.size,cr.PT);
+    gen_helper_ldc(tcg_env, perms_base, size, PT, MAC);
+ 
     return true;
 }
 
@@ -1824,35 +1837,40 @@ static bool trans_STC(DisasContext *s, arg_STC *a)
     TCGv_i64 addr = tcg_temp_new_i64();
     tcg_gen_mov_i64(addr, cpu_reg(s, a->r));
  
-    TCGv_i64 tmp1 = tcg_temp_new_i64();
-    TCGv_i32 tmp2 = tcg_temp_new_i32();
-    TCGv_i32 tmp3 = tcg_temp_new_i32();
-    TCGv_i64 tmp4 = tcg_temp_new_i64();
-    TCGv_i64 tmp5 = tcg_temp_new_i64();
+    TCGv_i64 cr_idx = tcg_temp_new_i64();
+    tcg_gen_movi_i64(cr_idx, a->cr);
+
+    TCGv_i64 perms_base = tcg_temp_new_i64();
+    TCGv_i32 offset = tcg_temp_new_i32();
+    TCGv_i32 size = tcg_temp_new_i32();
+    TCGv_i64 PT = tcg_temp_new_i64();
+    TCGv_i64 MAC = tcg_temp_new_i64();
 
     //perms_base
-    tcg_gen_ld_i64(tmp1, tcg_env, offsetof(CPUARMState, ccregs[a->cr].perms_base));
-    tcg_gen_qemu_st_i64(tmp1, addr, get_mem_index(s), MO_64);
+    tcg_gen_ld_i64(perms_base, tcg_env, offsetof(CPUARMState, ccregs[a->cr].perms_base));
+    tcg_gen_qemu_st_i64(perms_base, addr, get_mem_index(s), MO_64);
     tcg_gen_addi_i64(addr, addr, 8);
 
     //offset
-    tcg_gen_ld_i32(tmp2, tcg_env, offsetof(CPUARMState, ccregs[a->cr].offset));
-    tcg_gen_qemu_st_i32(tmp2, addr, get_mem_index(s), MO_32);
+    tcg_gen_ld_i32(offset, tcg_env, offsetof(CPUARMState, ccregs[a->cr].offset));
+    tcg_gen_qemu_st_i32(offset, addr, get_mem_index(s), MO_32);
     tcg_gen_addi_i64(addr, addr, 4);
     
     //size
-    tcg_gen_ld_i32(tmp3, tcg_env, offsetof(CPUARMState, ccregs[a->cr].size));
-    tcg_gen_qemu_st_i32(tmp3, addr, get_mem_index(s), MO_32);
+    tcg_gen_ld_i32(size, tcg_env, offsetof(CPUARMState, ccregs[a->cr].size));
+    tcg_gen_qemu_st_i32(size, addr, get_mem_index(s), MO_32);
     tcg_gen_addi_i64(addr, addr, 4);
     
     //PT
-    tcg_gen_ld_i64(tmp4, tcg_env, offsetof(CPUARMState, ccregs[a->cr].PT));
-    tcg_gen_qemu_st_i64(tmp4, addr, get_mem_index(s), MO_64);
+    tcg_gen_ld_i64(PT, tcg_env, offsetof(CPUARMState, ccregs[a->cr].PT));
+    tcg_gen_qemu_st_i64(PT, addr, get_mem_index(s), MO_64);
     tcg_gen_addi_i64(addr, addr, 8);
   
+    //gen_helper_stc(tcg_env, cr_idx, perms_base, size, PT);
+ 
     //MAC
-    tcg_gen_ld_i64(tmp5, tcg_env, offsetof(CPUARMState, ccregs[a->cr].MAC));
-    tcg_gen_qemu_st_i64(tmp5, addr, get_mem_index(s), MO_64);
+    tcg_gen_ld_i64(MAC, tcg_env, offsetof(CPUARMState, ccregs[a->cr].MAC));
+    tcg_gen_qemu_st_i64(MAC, addr, get_mem_index(s), MO_64);
     
     return true;
 }

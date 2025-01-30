@@ -134,11 +134,15 @@ DEF_HELPER_4(cpyfm, void, env, i32, i32, i32)
 DEF_HELPER_4(cpyfe, void, env, i32, i32, i32)
 
 // //ifdef TARGET_CRYPTO_CAP
+DEF_HELPER_5(stc, void, env, i64, i64, i32, i64)
+DEF_HELPER_5(ldc, void, env, i64, i32, i64, i64)
 DEF_HELPER_8(cldg, void, env, i64, i64, i64, i32, i32, i64, i64)
 DEF_HELPER_8(cstg, void, env, i64, i64, i64, i32, i32, i64, i64)
 DEF_HELPER_7(cldc, void, env, i64, i64, i32, i32, i64, i64)
 DEF_HELPER_6(csign, void, env, i64, i64, i32, i64, i64)
 DEF_HELPER_5(csigncl, void, env, i64, i64, i64, i64)
+DEF_HELPER_4(ccreate, void, env, i64, i64, i64)
+
 DEF_HELPER_1(updtcr, void, env)
 DEF_HELPER_1(updckeys, void, env)
 DEF_HELPER_1(ccall, void, env)
