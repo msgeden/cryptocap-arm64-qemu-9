@@ -142,6 +142,10 @@ DEF_HELPER_7(cldc, void, env, i64, i64, i32, i32, i64, i64)
 DEF_HELPER_6(csign, void, env, i64, i64, i32, i64, i64)
 DEF_HELPER_5(csigncl, void, env, i64, i64, i64, i64)
 DEF_HELPER_4(ccreate, void, env, i64, i64, i64)
+DEF_HELPER_4(csetbase, void, env, i64, i64, i64)
+DEF_HELPER_4(csetsize, void, env, i64, i64, i64)
+DEF_HELPER_4(csetperms, void, env, i64, i64, i64)
+
 
 DEF_HELPER_1(updtcr, void, env)
 DEF_HELPER_1(updckeys, void, env)

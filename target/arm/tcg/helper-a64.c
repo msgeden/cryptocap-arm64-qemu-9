@@ -2310,6 +2310,36 @@ void HELPER(ccreate)(CPUARMState *env, uint64_t crd_idx, uint64_t perms_base, ui
     env->ccregs[crd_idx].MAC=MACval;
     return;
 }
+
+void HELPER(csetbase)(CPUARMState *env, uint64_t crd, uint64_t crs, uint64_t rs)    
+{
+    //  if (rs_base>((uint64_t)crs_size+crs_base)||rs_base<crs_base){
+    //     int syn = syn_data_abort_no_iss(arm_current_el(env) != 0, 0, 0, 0, 0, 1, 0x11);
+    //             raise_exception_ra(env, EXCP_DATA_ABORT, syn,
+    //                             exception_target_el(env), GETPC());
+    //  }
+     return;
+}
+
+void HELPER(csetperms)(CPUARMState *env, uint64_t crd, uint64_t crs, uint64_t rs) 
+{
+    //  if (rs_perms>crs_perms){
+    //     int syn = syn_data_abort_no_iss(arm_current_el(env) != 0, 0, 0, 0, 0, 1, 0x11);
+    //             raise_exception_ra(env, EXCP_DATA_ABORT, syn,
+    //                             exception_target_el(env), GETPC());
+    //  }
+     return;
+}
+
+void HELPER(csetsize)(CPUARMState *env, uint64_t crd, uint64_t crs, uint64_t rs)   
+{
+    //  if (rs_size>((uint64_t)crs_size)){
+    //     int syn = syn_data_abort_no_iss(arm_current_el(env) != 0, 0, 0, 0, 0, 1, 0x11);
+    //             raise_exception_ra(env, EXCP_DATA_ABORT, syn,
+    //                             exception_target_el(env), GETPC());
+    //  }
+     return;
+}
 void HELPER(stc)(CPUARMState *env, uint64_t cr_idx, uint64_t perms_base, uint32_t size, uint64_t PT)
 {
     CCKey mkey=env->mkey;
