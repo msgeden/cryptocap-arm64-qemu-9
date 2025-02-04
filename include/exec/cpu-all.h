@@ -377,7 +377,8 @@ static inline bool tlb_hit_page(uint64_t tlb_addr, vaddr addr)
 //#ifdef TARGET_CRYPTO_CAP
 //    return false;
 //#endif
-    return addr == (tlb_addr & (TARGET_PAGE_MASK | TLB_INVALID_MASK));
+    bool res=(addr == (tlb_addr & (TARGET_PAGE_MASK | TLB_INVALID_MASK)));
+    return res;
 }
 
 /**

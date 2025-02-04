@@ -1926,6 +1926,11 @@ static bool trans_STC(DisasContext *s, arg_STC *a)
 
 static bool trans_CLDG(DisasContext *s, arg_CLDG *a)
 {
+    TCGv_i64 curr_pc = tcg_temp_new_i64();
+    tcg_gen_mov_i64(curr_pc, tcg_constant_i64(s->pc_curr));
+
+    //tcg_gen_movi_tl(cpu_pc, s->pc_curr);
+
     TCGv_i64 rd_idx = tcg_temp_new_i64();
     tcg_gen_movi_i64(rd_idx, a->r);
    
@@ -1945,13 +1950,16 @@ static bool trans_CLDG(DisasContext *s, arg_CLDG *a)
     tcg_gen_mov_i64(MAC, cpu_CC[a->cr].MAC);
     
     //MAC, bounds, permission checks
-    gen_helper_cldg(tcg_env, size_idx, rd_idx, perms_base, offset, size, PT, MAC);
+    gen_helper_cldg(tcg_env, size_idx, rd_idx, perms_base, offset, size, PT, MAC, curr_pc);
  
     return true;
 }
 
 static bool trans_CSTG(DisasContext *s, arg_CSTG *a)
 {
+    TCGv_i64 curr_pc = tcg_temp_new_i64();
+    tcg_gen_mov_i64(curr_pc, tcg_constant_i64(s->pc_curr));
+
     TCGv_i64 crd_idx = tcg_temp_new_i64();
     tcg_gen_movi_i64(crd_idx, a->r);
 
@@ -1971,7 +1979,7 @@ static bool trans_CSTG(DisasContext *s, arg_CSTG *a)
     tcg_gen_mov_i64(MAC, cpu_CC[a->cr].MAC);
 
     //MAC, bounds, permission checks 
-    gen_helper_cstg(tcg_env, size_idx, crd_idx, perms_base, offset, size, PT, MAC);
+    gen_helper_cstg(tcg_env, size_idx, crd_idx, perms_base, offset, size, PT, MAC, curr_pc);
 
     return true;
 }

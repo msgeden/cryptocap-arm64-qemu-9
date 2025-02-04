@@ -2364,7 +2364,7 @@ void HELPER(ldc)(CPUARMState *env, uint64_t perms_base, uint32_t size, uint64_t 
     return;
 }
 
-void HELPER(cstg)(CPUARMState *env, uint64_t size_idx, uint64_t r_idx, uint64_t perms_base, uint32_t offset, uint32_t size, uint64_t PT, uint64_t MAC)
+void HELPER(cstg)(CPUARMState *env, uint64_t size_idx, uint64_t r_idx, uint64_t perms_base, uint32_t offset, uint32_t size, uint64_t PT, uint64_t MAC, uint64_t curr_pc)
 {
     uint64_t perms = (perms_base >> 48);  
     uint64_t base = (perms_base & 0x0000FFFFFFFFFFFF);  
@@ -2408,7 +2408,9 @@ void HELPER(cstg)(CPUARMState *env, uint64_t size_idx, uint64_t r_idx, uint64_t 
 
         //env->cc_access_flag=true;
         //these values are set to help page walker to identify cross-domain memory accesses 
+        //env->pc=curr_pc;
         env->cc_access_pc=env->pc;
+        //env->cc_access_pc=curr_pc;
         env->cc_access_ttbr0=env->cp15.ttbr0_ns;
         env->cc_ttbr0=PT;
         switch (size_idx){
@@ -2433,8 +2435,11 @@ void HELPER(cstg)(CPUARMState *env, uint64_t size_idx, uint64_t r_idx, uint64_t 
     return;
 }
 
-void HELPER(cldg)(CPUARMState *env, uint64_t size_idx, uint64_t r_idx, uint64_t perms_base, uint32_t offset, uint32_t size, uint64_t PT, uint64_t MAC)
+void HELPER(cldg)(CPUARMState *env, uint64_t size_idx, uint64_t r_idx, uint64_t perms_base, uint32_t offset, uint32_t size, uint64_t PT, uint64_t MAC, uint64_t curr_pc)
 {
+
+    //tlb_flush(env_cpu(env));
+    //arm_rebuild_hflags(env);
     uint64_t perms = (perms_base >> 48);  
     uint64_t base = (perms_base & 0x0000FFFFFFFFFFFF);  
     uint64_t addr= base+(uint64_t)offset;
@@ -2475,9 +2480,40 @@ void HELPER(cldg)(CPUARMState *env, uint64_t size_idx, uint64_t r_idx, uint64_t 
                             exception_target_el(env), GETPC());
             return;
         }
+        //env->pc=curr_pc;
         env->cc_access_pc=env->pc;
+        //env->cc_access_pc=curr_pc;
+        //env->pc=curr_pc;
         env->cc_access_ttbr0=env->cp15.ttbr0_ns;
         env->cc_ttbr0=PT;
+        env->cc_tcrel1=env->cp15.tcr_el[1];
+        uint64_t tcr_el1=env->cp15.tcr_el[1];
+        
+        //E0PD0, bit [55] FEAT_E0PD:  Unprivileged access to any address translated by TTBR0_EL1 will not generate a fault by this mechanism.
+        //HD, bit [40] FEAT_HAFDBS: Stage 1 hardware management of dirty state disabled.
+        //HA, bit [39] FEAT_HAFDBS: Stage 1 Access flag update disabled.
+        //EPD0, bit [7] Perform translation table walks using TTBR0_EL1.
+        tcr_el1&=0b1111111101111111111111100111111111111111111111111111111101111111;
+        env->cp15.tcr_el[1]=tcr_el1;
+
+        // int mmu_idx = ARMMMUIdx_Stage1_EL0;  // Replace with the actual mmu_idx value
+
+        // // Perform the memory access
+        // uint64_t value;
+        // MMULookupPageData data;
+        // data.addr = addr;
+        // data.size = 8; // Example size
+
+        // // Force a page table walk
+        // if (!mmu_lookup1(env_cpu(env), &data, mmu_idx, MMU_DATA_LOAD, 0)) {
+        //     // Handle page table walk failure
+        //     //printf("Page table walk failed for address: 0x%lx\n", addr);
+        //     return;
+        // }
+        
+        // tlb_flush(env_cpu(env));
+        // arm_rebuild_hflags(env);
+        
         switch (size_idx){
             case 0:
                 lvalue = cpu_ldq_data(env, addr);
@@ -2489,13 +2525,14 @@ void HELPER(cldg)(CPUARMState *env, uint64_t size_idx, uint64_t r_idx, uint64_t 
                 lvalue = cpu_lduw_data(env, addr);
                 break;
             case 3:
-                lvalue = cpu_ldub_data(env, addr);
+                lvalue = cpu_ldub_data_cc(env, addr);
                 break;
             default:
                 lvalue = cpu_ldq_data(env, addr);
         }
         env->xregs[r_idx] = lvalue;
     }
+    env->cp15.tcr_el[1]=env->cc_tcrel1;
     return;
 }
 

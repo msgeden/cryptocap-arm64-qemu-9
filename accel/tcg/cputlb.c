@@ -44,6 +44,20 @@
 #include "tcg/tcg-ldst.h"
 #include "tcg/oversized-guest.h"
 
+
+#include "qemu/osdep.h"
+#include "qemu/log.h"
+#include "qemu/range.h"
+#include "qemu/main-loop.h"
+#include "exec/exec-all.h"
+#include "cpu.h"
+#include "internals.h"
+#include "cpu-features.h"
+#include "idau.h"
+#ifdef CONFIG_TCG
+# include "tcg/oversized-guest.h"
+#endif
+
 /* DEBUG defines, enable DEBUG_TLB_LOG to log to the CPU_LOG_MMU target */
 /* #define DEBUG_TLB */
 /* #define DEBUG_TLB_LOG */
@@ -1314,6 +1328,23 @@ static void tlb_fill(CPUState *cpu, vaddr addr, int size,
     assert(ok);
 }
 
+/*
+ * Note: tlb_skip_cc().
+ */
+static void tlb_skip_cc(CPUState *cpu, vaddr addr, int size,
+                     MMUAccessType access_type, int mmu_idx, uintptr_t retaddr)
+{
+    bool ok;
+
+    /*
+     * This is not a probe, so only valid return is success; failure
+     * should result in exception + longjmp to the cpu loop.
+     */
+    ok = cpu->cc->tcg_ops->tlb_skip_cc(cpu, addr, size,
+                                    access_type, mmu_idx, false, retaddr);
+    assert(ok);
+}
+
 static inline void cpu_unaligned_access(CPUState *cpu, vaddr addr,
                                         MMUAccessType access_type,
                                         int mmu_idx, uintptr_t retaddr)
@@ -1359,6 +1390,9 @@ static void io_failed(CPUState *cpu, CPUTLBEntryFull *full, vaddr addr,
 static bool victim_tlb_hit(CPUState *cpu, size_t mmu_idx, size_t index,
                            MMUAccessType access_type, vaddr page)
 {
+    //#ifdef TARGET_CRYPTO_CAP
+    //return false;
+    //#endif
     size_t vidx;
 
     assert_cpu_is_self(cpu);
@@ -1424,8 +1458,12 @@ static int probe_access_internal(CPUState *cpu, vaddr addr,
     bool force_mmio = check_mem_cbs && cpu_plugin_mem_cbs_enabled(cpu);
     CPUTLBEntryFull *full;
     //TARGET_CRYPTO_CAP: TLB Miss
+    //#ifdef TARGET_CRYPTO_CAP
+    //if (true){
+    //    if (true){
     if (!tlb_hit_page(tlb_addr, page_addr)) {
         if (!victim_tlb_hit(cpu, mmu_idx, index, access_type, page_addr)) {
+    //#endif        
             if (!cpu->cc->tcg_ops->tlb_fill(cpu, addr, fault_size, access_type,
                                             mmu_idx, nonfault, retaddr)) {
                 /* Non-faulting page table read failed.  */
@@ -1507,6 +1545,64 @@ int probe_access_full_mmu(CPUArchState *env, vaddr addr, int size,
     return flags;
 }
 
+//#ifdef TARGET_CRYPTO_CAP
+static int probe_access_internal_cc(CPUState *cpu, vaddr addr,
+                                 int fault_size, MMUAccessType access_type,
+                                 int mmu_idx, bool nonfault,
+                                 void **phost, CPUTLBEntryFull **pfull,
+                                 uintptr_t retaddr, bool check_mem_cbs)
+{
+    uintptr_t index = tlb_index(cpu, mmu_idx, addr);
+    CPUTLBEntry *entry = tlb_entry(cpu, mmu_idx, addr);
+    uint64_t tlb_addr = tlb_read_idx(entry, access_type);
+    vaddr page_addr = addr & TARGET_PAGE_MASK;
+    int flags = TLB_FLAGS_MASK & ~TLB_FORCE_SLOW;
+    bool force_mmio = check_mem_cbs && cpu_plugin_mem_cbs_enabled(cpu);
+    CPUTLBEntryFull *full;
+    //TARGET_CRYPTO_CAP: TLB Miss
+    //#ifdef TARGET_CRYPTO_CAP
+    //if (true){
+    //    if (true){
+    if (!tlb_hit_page(tlb_addr, page_addr)) {
+        if (!victim_tlb_hit(cpu, mmu_idx, index, access_type, page_addr)) {
+    //#endif        
+            if (!cpu->cc->tcg_ops->tlb_fill(cpu, addr, fault_size, access_type,
+                                            mmu_idx, nonfault, retaddr)) {
+                /* Non-faulting page table read failed.  */
+                *phost = NULL;
+                *pfull = NULL;
+                return TLB_INVALID_MASK;
+            }
+
+            /* TLB resize via tlb_fill may have moved the entry.  */
+            index = tlb_index(cpu, mmu_idx, addr);
+            entry = tlb_entry(cpu, mmu_idx, addr);
+
+            /*
+             * With PAGE_WRITE_INV, we set TLB_INVALID_MASK immediately,
+             * to force the next access through tlb_fill.  We've just
+             * called tlb_fill, so we know that this entry *is* valid.
+             */
+            flags &= ~TLB_INVALID_MASK;
+        }
+        tlb_addr = tlb_read_idx(entry, access_type);
+    }
+    flags &= tlb_addr;
+
+    *pfull = full = &cpu->neg.tlb.d[mmu_idx].fulltlb[index];
+    flags |= full->slow_flags[access_type];
+
+    /* Fold all "mmio-like" bits into TLB_MMIO.  This is not RAM.  */
+    if (unlikely(flags & ~(TLB_WATCHPOINT | TLB_NOTDIRTY | TLB_CHECK_ALIGNED))
+        || (access_type != MMU_INST_FETCH && force_mmio)) {
+        *phost = NULL;
+        return TLB_MMIO;
+    }
+
+    /* Everything else is RAM. */
+    *phost = (void *)((uintptr_t)addr + entry->addend);
+    return flags;
+}
 
 int probe_access_full_mmu_cc(CPUArchState *env, vaddr addr, int size,
                           MMUAccessType access_type, int mmu_idx,
@@ -1519,7 +1615,7 @@ int probe_access_full_mmu_cc(CPUArchState *env, vaddr addr, int size,
     phost = phost ? phost : &discard_phost;
     pfull = pfull ? pfull : &discard_tlb;
 
-    int flags = probe_access_internal(env_cpu(env), addr, size, access_type,
+    int flags = probe_access_internal_cc(env_cpu(env), addr, size, access_type,
                                       mmu_idx, false, phost, pfull, 0, false);
 
     /* Handle clean RAM pages.  */
@@ -1531,6 +1627,7 @@ int probe_access_full_mmu_cc(CPUArchState *env, vaddr addr, int size,
 
     return flags;
 }
+//#endif
 
 
 
@@ -1706,6 +1803,61 @@ typedef struct MMULookupLocals {
     int mmu_idx;
 } MMULookupLocals;
 
+
+
+typedef struct S1Translate {
+    /*
+     * in_mmu_idx : specifies which TTBR, TCR, etc to use for the walk.
+     * Together with in_space, specifies the architectural translation regime.
+     */
+    ARMMMUIdx in_mmu_idx;
+    /*
+     * in_ptw_idx: specifies which mmuidx to use for the actual
+     * page table descriptor load operations. This will be one of the
+     * ARMMMUIdx_Stage2* or one of the ARMMMUIdx_Phys_* indexes.
+     * If a Secure ptw is "downgraded" to NonSecure by an NSTable bit,
+     * this field is updated accordingly.
+     */
+    ARMMMUIdx in_ptw_idx;
+    /*
+     * in_space: the security space for this walk. This plus
+     * the in_mmu_idx specify the architectural translation regime.
+     * If a Secure ptw is "downgraded" to NonSecure by an NSTable bit,
+     * this field is updated accordingly.
+     *
+     * Note that the security space for the in_ptw_idx may be different
+     * from that for the in_mmu_idx. We do not need to explicitly track
+     * the in_ptw_idx security space because:
+     *  - if the in_ptw_idx is an ARMMMUIdx_Phys_* then the mmuidx
+     *    itself specifies the security space
+     *  - if the in_ptw_idx is an ARMMMUIdx_Stage2* then the security
+     *    space used for ptw reads is the same as that of the security
+     *    space of the stage 1 translation for all cases except where
+     *    stage 1 is Secure; in that case the only possibilities for
+     *    the ptw read are Secure and NonSecure, and the in_ptw_idx
+     *    value being Stage2 vs Stage2_S distinguishes those.
+     */
+    ARMSecuritySpace in_space;
+    /*
+     * in_debug: is this a QEMU debug access (gdbstub, etc)? Debug
+     * accesses will not update the guest page table access flags
+     * and will not change the state of the softmmu TLBs.
+     */
+    bool in_debug;
+    /*
+     * If this is stage 2 of a stage 1+2 page table walk, then this must
+     * be true if stage 1 is an EL0 access; otherwise this is ignored.
+     * Stage 2 is indicated by in_mmu_idx set to ARMMMUIdx_Stage2{,_S}.
+     */
+    bool in_s1_is_el0;
+    bool out_rw;
+    bool out_be;
+    ARMSecuritySpace out_space;
+    hwaddr out_virt;
+    hwaddr out_phys;
+    void *out_host;
+} S1Translate;
+
 /**
  * mmu_lookup1: translate one page
  * @cpu: generic cpu state
@@ -1731,9 +1883,12 @@ static bool mmu_lookup1(CPUState *cpu, MMULookupPageData *data,
     int flags;
 
     /* If the TLB entry is for a different page, reload and try again.  */
+    //#ifdef TARGET_CRYPTO_CAP
+    //if (true){
+    //    if (true){
     if (!tlb_hit(tlb_addr, addr)) {
-        if (!victim_tlb_hit(cpu, mmu_idx, index, access_type,
-                            addr & TARGET_PAGE_MASK)) {
+        if (!victim_tlb_hit(cpu, mmu_idx, index, access_type, addr & TARGET_PAGE_MASK)) {
+    //#endif
             tlb_fill(cpu, addr, data->size, access_type, mmu_idx, ra);
             maybe_resized = true;
             index = tlb_index(cpu, mmu_idx, addr);
@@ -1754,6 +1909,58 @@ static bool mmu_lookup1(CPUState *cpu, MMULookupPageData *data,
     return maybe_resized;
 }
 
+//#ifdef TARGET_CRYPTO_CAP
+/**
+ * mmu_lookup1: translate one page
+ * @cpu: generic cpu state
+ * @data: lookup parameters
+ * @mmu_idx: virtual address context
+ * @access_type: load/store/code
+ * @ra: return address into tcg generated code, or 0
+ *
+ * Resolve the translation for the one page at @data.addr, filling in
+ * the rest of @data with the results.  If the translation fails,
+ * tlb_fill will longjmp out.  Return true if the softmmu tlb for
+ * @mmu_idx may have resized.
+ */
+static bool mmu_lookup1_cc(CPUState *cpu, MMULookupPageData *data,
+                        int mmu_idx, MMUAccessType access_type, uintptr_t ra)
+{
+   vaddr addr = data->addr;
+    uintptr_t index = tlb_index(cpu, mmu_idx, addr);
+    CPUTLBEntry *entry = tlb_entry(cpu, mmu_idx, addr);
+    uint64_t tlb_addr = tlb_read_idx(entry, access_type);
+    bool maybe_resized = false;
+    CPUTLBEntryFull *full;
+    int flags;
+
+    /* If the TLB entry is for a different page, reload and try again.  */
+    //#ifdef TARGET_CRYPTO_CAP
+    //if (true){
+    //    if (true){
+    if (!tlb_hit(tlb_addr, addr)) {
+        if (!victim_tlb_hit(cpu, mmu_idx, index, access_type, addr & TARGET_PAGE_MASK)) {
+    //#endif
+            tlb_fill(cpu, addr, data->size, access_type, mmu_idx, ra);
+            maybe_resized = true;
+            index = tlb_index(cpu, mmu_idx, addr);
+            entry = tlb_entry(cpu, mmu_idx, addr);
+        }
+        tlb_addr = tlb_read_idx(entry, access_type) & ~TLB_INVALID_MASK;
+    }
+
+    full = &cpu->neg.tlb.d[mmu_idx].fulltlb[index];
+    flags = tlb_addr & (TLB_FLAGS_MASK & ~TLB_FORCE_SLOW);
+    flags |= full->slow_flags[access_type];
+
+    data->full = full;
+    data->flags = flags;
+    /* Compute haddr speculatively; depending on flags it might be invalid. */
+    data->haddr = (void *)((uintptr_t)addr + entry->addend);
+
+    return maybe_resized;
+}
+//#endif
 /**
  * mmu_watch_or_dirty
  * @cpu: generic cpu state
@@ -1845,6 +2052,111 @@ static bool mmu_lookup(CPUState *cpu, vaddr addr, MemOpIdx oi,
          */
         mmu_lookup1(cpu, &l->page[0], l->mmu_idx, type, ra);
         if (mmu_lookup1(cpu, &l->page[1], l->mmu_idx, type, ra)) {
+            uintptr_t index = tlb_index(cpu, l->mmu_idx, addr);
+            l->page[0].full = &cpu->neg.tlb.d[l->mmu_idx].fulltlb[index];
+        }
+
+        flags = l->page[0].flags | l->page[1].flags;
+        if (unlikely(flags & (TLB_WATCHPOINT | TLB_NOTDIRTY))) {
+            mmu_watch_or_dirty(cpu, &l->page[0], type, ra);
+            mmu_watch_or_dirty(cpu, &l->page[1], type, ra);
+        }
+
+        /*
+         * Since target/sparc is the only user of TLB_BSWAP, and all
+         * Sparc accesses are aligned, any treatment across two pages
+         * would be arbitrary.  Refuse it until there's a use.
+         */
+        tcg_debug_assert((flags & TLB_BSWAP) == 0);
+    }
+
+    /*
+     * This alignment check differs from the one above, in that this is
+     * based on the atomicity of the operation. The intended use case is
+     * the ARM memory type field of each PTE, where access to pages with
+     * Device memory type require alignment.
+     */
+    if (unlikely(flags & TLB_CHECK_ALIGNED)) {
+        MemOp size = l->memop & MO_SIZE;
+
+        switch (l->memop & MO_ATOM_MASK) {
+        case MO_ATOM_NONE:
+            size = MO_8;
+            break;
+        case MO_ATOM_IFALIGN_PAIR:
+        case MO_ATOM_WITHIN16_PAIR:
+            size = size ? size - 1 : 0;
+            break;
+        default:
+            break;
+        }
+        if (addr & ((1 << size) - 1)) {
+            cpu_unaligned_access(cpu, addr, type, l->mmu_idx, ra);
+        }
+    }
+
+    return crosspage;
+}
+
+
+/**
+ * mmu_lookup: translate page(s)
+ * @cpu: generic cpu state
+ * @addr: virtual address
+ * @oi: combined mmu_idx and MemOp
+ * @ra: return address into tcg generated code, or 0
+ * @access_type: load/store/code
+ * @l: output result
+ *
+ * Resolve the translation for the page(s) beginning at @addr, for MemOp.size
+ * bytes.  Return true if the lookup crosses a page boundary.
+ */
+static bool mmu_lookup_cc(CPUState *cpu, vaddr addr, MemOpIdx oi,
+                       uintptr_t ra, MMUAccessType type, MMULookupLocals *l)
+{
+      unsigned a_bits;
+    bool crosspage;
+    int flags;
+
+    l->memop = get_memop(oi);
+    l->mmu_idx = get_mmuidx(oi);
+
+    tcg_debug_assert(l->mmu_idx < NB_MMU_MODES);
+
+    /* Handle CPU specific unaligned behaviour */
+    a_bits = get_alignment_bits(l->memop);
+    if (addr & ((1 << a_bits) - 1)) {
+        cpu_unaligned_access(cpu, addr, type, l->mmu_idx, ra);
+    }
+
+    l->page[0].addr = addr;
+    l->page[0].size = memop_size(l->memop);
+    l->page[1].addr = (addr + l->page[0].size - 1) & TARGET_PAGE_MASK;
+    l->page[1].size = 0;
+    crosspage = (addr ^ l->page[1].addr) & TARGET_PAGE_MASK;
+
+    if (likely(!crosspage)) {
+        mmu_lookup1_cc(cpu, &l->page[0], l->mmu_idx, type, ra);
+
+        flags = l->page[0].flags;
+        if (unlikely(flags & (TLB_WATCHPOINT | TLB_NOTDIRTY))) {
+            mmu_watch_or_dirty(cpu, &l->page[0], type, ra);
+        }
+        if (unlikely(flags & TLB_BSWAP)) {
+            l->memop ^= MO_BSWAP;
+        }
+    } else {
+        /* Finish compute of page crossing. */
+        int size0 = l->page[1].addr - addr;
+        l->page[1].size = l->page[0].size - size0;
+        l->page[0].size = size0;
+
+        /*
+         * Lookup both pages, recognizing exceptions from either.  If the
+         * second lookup potentially resized, refresh first CPUTLBEntryFull.
+         */
+        mmu_lookup1_cc(cpu, &l->page[0], l->mmu_idx, type, ra);
+        if (mmu_lookup1_cc(cpu, &l->page[1], l->mmu_idx, type, ra)) {
             uintptr_t index = tlb_index(cpu, l->mmu_idx, addr);
             l->page[0].full = &cpu->neg.tlb.d[l->mmu_idx].fulltlb[index];
         }
@@ -2418,6 +2730,21 @@ static uint8_t do_ld1_mmu(CPUState *cpu, vaddr addr, MemOpIdx oi,
 
     cpu_req_mo(TCG_MO_LD_LD | TCG_MO_ST_LD);
     crosspage = mmu_lookup(cpu, addr, oi, ra, access_type, &l);
+    tcg_debug_assert(!crosspage);
+
+    return do_ld_1(cpu, &l.page[0], l.mmu_idx, access_type, ra);
+}
+
+static uint8_t do_ld1_mmu_cc(CPUState *cpu, vaddr addr, MemOpIdx oi,
+                          uintptr_t ra, MMUAccessType access_type)
+{
+    MMULookupLocals l;
+    bool crosspage;
+
+    cpu_req_mo(TCG_MO_LD_LD | TCG_MO_ST_LD);
+    crosspage = mmu_lookup_cc(cpu, addr, oi, ra, access_type, &l);
+    //atomic_mmu_lookup(cpu, addr, oi, access_type, ra &l);
+    
     tcg_debug_assert(!crosspage);
 
     return do_ld_1(cpu, &l.page[0], l.mmu_idx, access_type, ra);

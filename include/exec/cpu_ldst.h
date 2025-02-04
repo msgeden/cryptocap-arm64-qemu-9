@@ -125,6 +125,11 @@ typedef vaddr abi_ptr;
 #define TARGET_ABI_FMT_ptr VADDR_PRIx
 #endif
 
+//#ifdef TARGET_CRYPTO_CAP
+uint32_t cpu_ldub_data_cc(CPUArchState *env, abi_ptr ptr);
+uint32_t cpu_ldub_data_ra_cc(CPUArchState *env, abi_ptr ptr, uintptr_t ra);
+//#endif
+
 uint32_t cpu_ldub_data(CPUArchState *env, abi_ptr ptr);
 int cpu_ldsb_data(CPUArchState *env, abi_ptr ptr);
 uint32_t cpu_lduw_be_data(CPUArchState *env, abi_ptr ptr);

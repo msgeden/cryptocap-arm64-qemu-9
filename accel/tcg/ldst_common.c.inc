@@ -544,3 +544,79 @@ void cpu_stq_le_data(CPUArchState *env, abi_ptr addr, uint64_t val)
 {
     cpu_stq_le_data_ra(env, addr, val, 0);
 }
+
+//#ifdef TARGET_CRYPTO_CAP
+/*--------------------------*/
+uint8_t cpu_ldb_mmu_cc(CPUArchState *env, abi_ptr addr, MemOpIdx oi, uintptr_t ra)
+{
+    uint8_t ret;
+
+    tcg_debug_assert((get_memop(oi) & MO_SIZE) == MO_UB);
+    ret = do_ld1_mmu_cc(env_cpu(env), addr, oi, ra, MMU_CC_DATA_LOAD);
+    plugin_load_cb(env, addr, oi);
+    return ret;
+}
+
+uint32_t cpu_ldub_mmuidx_ra_cc(CPUArchState *env, abi_ptr addr,
+                            int mmu_idx, uintptr_t ra)
+{
+    MemOpIdx oi = make_memop_idx(MO_UB, mmu_idx);
+    return cpu_ldb_mmu_cc(env, addr, oi, ra);
+}
+
+uint32_t cpu_ldub_data_ra_cc(CPUArchState *env, abi_ptr addr, uintptr_t ra)
+{
+    int mmu_index = cpu_mmu_index(env_cpu(env), false);
+    return cpu_ldub_mmuidx_ra_cc(env, addr, mmu_index, ra);
+}
+
+uint32_t cpu_ldub_data_cc(CPUArchState *env, abi_ptr addr)
+{
+    return cpu_ldub_data_ra_cc(env, addr, 0);
+}
+
+//#endif
+// int cpu_ldsb_data(CPUArchState *env, abi_ptr addr)
+// {
+//     return (int8_t)cpu_ldub_data(env, addr);
+// }
+
+// uint32_t cpu_lduw_be_data(CPUArchState *env, abi_ptr addr)
+// {
+//     return cpu_lduw_be_data_ra(env, addr, 0);
+// }
+
+// int cpu_ldsw_be_data(CPUArchState *env, abi_ptr addr)
+// {
+//     return (int16_t)cpu_lduw_be_data(env, addr);
+// }
+
+// uint32_t cpu_ldl_be_data(CPUArchState *env, abi_ptr addr)
+// {
+//     return cpu_ldl_be_data_ra(env, addr, 0);
+// }
+
+// uint64_t cpu_ldq_be_data(CPUArchState *env, abi_ptr addr)
+// {
+//     return cpu_ldq_be_data_ra(env, addr, 0);
+// }
+
+// uint32_t cpu_lduw_le_data(CPUArchState *env, abi_ptr addr)
+// {
+//     return cpu_lduw_le_data_ra(env, addr, 0);
+// }
+
+// int cpu_ldsw_le_data(CPUArchState *env, abi_ptr addr)
+// {
+//     return (int16_t)cpu_lduw_le_data(env, addr);
+// }
+
+// uint32_t cpu_ldl_le_data(CPUArchState *env, abi_ptr addr)
+// {
+//     return cpu_ldl_le_data_ra(env, addr, 0);
+// }
+
+// uint64_t cpu_ldq_le_data(CPUArchState *env, abi_ptr addr)
+// {
+//     return cpu_ldq_le_data_ra(env, addr, 0);
+// }

@@ -267,12 +267,17 @@ typedef struct CPUArchState {
     uint64_t ptcr;
     //cross-domain access flag for MMU
     bool cc_access_flag;
+
     //IMPORTANT: Since there is no direct association between page-walk and memory instructions, the pc+TTBR0 value is used as identifier to perform a page walk based on a cap.PT value
     uint64_t cc_access_pc;
     uint64_t cc_access_ttbr0;
+    uint64_t cc_flag;
+    
     //secondary PT base register for a separate walk to be triggered by domain-crossing crypto capabilities
     uint64_t cc_ttbr0;
-    //uint64_t cc_ttbr1;
+    uint64_t cc_ttbr1;
+    //secondary TCR register for Translation Control Register (EL1) to revert to original values
+    uint64_t cc_tcrel1;
 //#endif
 
     /* PSTATE isn't an architectural register for ARMv8. However, it is

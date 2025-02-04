@@ -194,7 +194,7 @@ static uint64_t regime_ttbr(CPUARMState *env, ARMMMUIdx mmu_idx, int ttbrn)
 {
 //#ifdef TARGET_CRYPTO_CAP
     //if (env->cc_access_flag){
-    if (env->cc_access_ttbr0 == env->cp15.ttbr0_ns && env->cc_access_pc == env->pc){
+    if (env->cc_access_ttbr0 == env->cp15.ttbr0_ns && env->cc_access_pc == env->pc && ttbrn==0){
     //if (env->cc_access_ttbr == env->cp15.ttbr1_ns && env->cc_access_pc == env->pc){
         //env->cc_access_flag = false;
         env->cc_access_pc=0;
@@ -219,6 +219,13 @@ static uint64_t regime_ttbr(CPUARMState *env, ARMMMUIdx mmu_idx, int ttbrn)
 //#endif
 }
 
+
+/* Return the TTBR associated with this translation regime */
+static uint64_t regime_ttbr_cc(CPUARMState *env, ARMMMUIdx mmu_idx, int ttbrn)
+{
+    //env->cp15.tcr_el[1]=env->cc_tcrel1;
+    return env->cc_ttbr0;
+}
 /* Return true if the specified stage of address translation is disabled */
 static bool regime_translation_disabled(CPUARMState *env, ARMMMUIdx mmu_idx,
                                         ARMSecuritySpace space)
@@ -562,8 +569,10 @@ static bool S1_ptw_translate(CPUARMState *env, S1Translate *ptw,
     uint8_t pte_attrs;
 
     ptw->out_virt = addr;
-
+    //#ifdef TARGET_CRYPTO_CAP
     if (unlikely(ptw->in_debug)) {
+    //if (true){
+    //#endif 
         /*
          * From gdbstub, do not use softmmu so that we don't modify the
          * state of the cpu at all, including softmmu tlb contents.
@@ -641,6 +650,96 @@ static bool S1_ptw_translate(CPUARMState *env, S1Translate *ptw,
     fi->s1ns = fault_s1ns(ptw->in_space, s2_mmu_idx);
     return false;
 }
+
+//#ifdef TARGET_CRYPTO_CAP
+/* Translate a S1 pagetable walk through S2 if needed.  */
+static bool S1_ptw_translate_cc(CPUARMState *env, S1Translate *ptw,
+                             hwaddr addr, ARMMMUFaultInfo *fi)
+{
+    ARMMMUIdx mmu_idx = ptw->in_mmu_idx;
+    ARMMMUIdx s2_mmu_idx = ptw->in_ptw_idx;
+    uint8_t pte_attrs;
+
+    ptw->out_virt = addr;
+    if (unlikely(ptw->in_debug)) {
+        /*
+         * From gdbstub, do not use softmmu so that we don't modify the
+         * state of the cpu at all, including softmmu tlb contents.
+         */
+        ARMSecuritySpace s2_space = S2_security_space(ptw->in_space, s2_mmu_idx);
+        S1Translate s2ptw = {
+            .in_mmu_idx = s2_mmu_idx,
+            .in_ptw_idx = ptw_idx_for_stage_2(env, s2_mmu_idx),
+            .in_space = s2_space,
+            .in_debug = true,
+        };
+        GetPhysAddrResult s2 = { };
+
+        if (get_phys_addr_gpc(env, &s2ptw, addr, MMU_CC_DATA_LOAD, &s2, fi)) {
+            goto fail;
+        }
+
+        ptw->out_phys = s2.f.phys_addr;
+        pte_attrs = s2.cacheattrs.attrs;
+        ptw->out_host = NULL;
+        ptw->out_rw = false;
+        ptw->out_space = s2.f.attrs.space;
+    } else {
+#ifdef CONFIG_TCG
+        //TARGET_CRYPTO_CAP:  check TLB first 
+        CPUTLBEntryFull *full;
+        int flags;
+
+        env->tlb_fi = fi;
+        flags = probe_access_full_mmu_cc(env, addr, 0, MMU_CC_DATA_LOAD,
+                                      arm_to_core_mmu_idx(s2_mmu_idx),
+                                      &ptw->out_host, &full);
+        env->tlb_fi = NULL;
+
+        if (unlikely(flags & TLB_INVALID_MASK)) {
+            goto fail;
+        }
+        ptw->out_phys = full->phys_addr | (addr & ~TARGET_PAGE_MASK);
+        ptw->out_rw = full->prot & PAGE_WRITE;
+        pte_attrs = full->extra.arm.pte_attrs;
+        ptw->out_space = full->attrs.space;
+#else
+        g_assert_not_reached();
+#endif
+    }
+
+    if (regime_is_stage2(s2_mmu_idx)) {
+        uint64_t hcr = arm_hcr_el2_eff_secstate(env, ptw->in_space);
+
+        if ((hcr & HCR_PTW) && S2_attrs_are_device(hcr, pte_attrs)) {
+            /*
+             * PTW set and S1 walk touched S2 Device memory:
+             * generate Permission fault.
+             */
+            fi->type = ARMFault_Permission;
+            fi->s2addr = addr;
+            fi->stage2 = true;
+            fi->s1ptw = true;
+            fi->s1ns = fault_s1ns(ptw->in_space, s2_mmu_idx);
+            return false;
+        }
+    }
+
+    ptw->out_be = regime_translation_big_endian(env, mmu_idx);
+    return true;
+
+ fail:
+    assert(fi->type != ARMFault_None);
+    if (fi->type == ARMFault_GPCFOnOutput) {
+        fi->type = ARMFault_GPCFOnWalk;
+    }
+    fi->s2addr = addr;
+    fi->stage2 = regime_is_stage2(s2_mmu_idx);
+    fi->s1ptw = fi->stage2;
+    fi->s1ns = fault_s1ns(ptw->in_space, s2_mmu_idx);
+    return false;
+}
+
 
 /* All loads done in the course of a page table walk go through here. */
 static uint32_t arm_ldl_ptw(CPUARMState *env, S1Translate *ptw,
@@ -1789,7 +1888,16 @@ static bool get_phys_addr_lpae(CPUARMState *env, S1Translate *ptw,
      * implement any ASID-like capability so we can ignore it (instead
      * we will always flush the TLB any time the ASID is changed).
      */
-    ttbr = regime_ttbr(env, mmu_idx, param.select);
+    //#ifdef TARGET_CRYPTO_CAP
+    if (access_type == MMU_CC_DATA_LOAD || access_type==MMU_CC_DATA_STORE){
+        ttbr = regime_ttbr_cc(env, mmu_idx, param.select);
+    }
+    else{
+    //#endif
+        ttbr = regime_ttbr(env, mmu_idx, param.select);
+    //#ifdef TARGET_CRYPTO_CAP
+    }
+    //#endif
 
     /*
      * Here we should have set up all the parameters for the translation:
@@ -1895,10 +2003,21 @@ static bool get_phys_addr_lpae(CPUARMState *env, S1Translate *ptw,
         ptw->in_ptw_idx += 1;
         ptw->in_space = ARMSS_NonSecure;
     }
-
-    if (!S1_ptw_translate(env, ptw, descaddr, fi)) {
-        goto do_fault;
+    //#ifdef TARGET_CRYPTO_CAP
+    if (access_type == MMU_CC_DATA_LOAD || access_type==MMU_CC_DATA_STORE){
+        if (!S1_ptw_translate_cc(env, ptw, descaddr, fi)) {
+            goto do_fault;
+        }
     }
+    else{
+    //#endif
+           if (!S1_ptw_translate(env, ptw, descaddr, fi)) {
+            goto do_fault;
+        }
+    //#ifdef TARGET_CRYPTO_CAP
+    }
+    //#endif
+
     descriptor = arm_ldq_ptw(env, ptw, fi);
     if (fi->type != ARMFault_None) {
         goto do_fault;
@@ -2102,7 +2221,10 @@ static bool get_phys_addr_lpae(CPUARMState *env, S1Translate *ptw,
                                     result->f.attrs.space, out_space);
     }
 
-    if (!(result->f.prot & (1 << access_type))) {
+//#ifdef TARGET_CRYPTO_CAP
+    if (access_type!=MMU_CC_DATA_LOAD && access_type!=MMU_CC_DATA_STORE && !(result->f.prot & (1 << access_type))) {
+    //if (!(result->f.prot & (1 << access_type))) {
+//#endif
         fi->type = ARMFault_Permission;
         goto do_fault;
     }

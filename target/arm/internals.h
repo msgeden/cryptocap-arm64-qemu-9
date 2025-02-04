@@ -769,6 +769,10 @@ void arm_cpu_record_sigbus(CPUState *cpu, vaddr addr,
 bool arm_cpu_tlb_fill(CPUState *cs, vaddr address, int size,
                       MMUAccessType access_type, int mmu_idx,
                       bool probe, uintptr_t retaddr);
+
+bool arm_cpu_tlb_skip_cc(CPUState *cs, vaddr address, int size,
+                      MMUAccessType access_type, int mmu_idx,
+                      bool probe, uintptr_t retaddr);
 #endif
 
 static inline int arm_to_core_mmu_idx(ARMMMUIdx mmu_idx)
@@ -959,7 +963,8 @@ static inline uint64_t regime_tcr(CPUARMState *env, ARMMMUIdx mmu_idx)
         v |= env->cp15.vtcr_el2 & VTCR_SHARED_FIELD_MASK;
         return v;
     }
-    return env->cp15.tcr_el[regime_el(env, mmu_idx)];
+    uint64_t tcr=env->cp15.tcr_el[regime_el(env, mmu_idx)];
+    return tcr;
 }
 
 /* Return true if the translation regime is using LPAE format page tables */

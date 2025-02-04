@@ -124,6 +124,16 @@ struct TCGCPUOps {
     bool (*tlb_fill)(CPUState *cpu, vaddr address, int size,
                      MMUAccessType access_type, int mmu_idx,
                      bool probe, uintptr_t retaddr);
+
+    /**
+     * @tlb_skip_cc: Handle a softmmu tlb skip for cryptocaps
+     *
+
+     */
+    bool (*tlb_skip_cc)(CPUState *cpu, vaddr address, int size,
+                     MMUAccessType access_type, int mmu_idx,
+                     bool probe, uintptr_t retaddr);  
+                                        
     /**
      * @do_transaction_failed: Callback for handling failed memory transactions
      * (ie bus faults or external aborts; not MMU faults)

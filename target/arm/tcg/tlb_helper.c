@@ -262,6 +262,7 @@ void arm_deliver_fault(ARMCPU *cpu, vaddr addr,
     raise_exception(env, exc, syn, target_el);
 }
 
+
 /* Raise a data fault alignment exception for the specified virtual address */
 void arm_cpu_do_unaligned_access(CPUState *cs, vaddr vaddr,
                                  MMUAccessType access_type,
@@ -350,7 +351,64 @@ bool arm_cpu_tlb_fill(CPUState *cs, vaddr address, int size,
     if (likely(!ret)) {
         /*
          * Map a single [sub]page. Regions smaller than our declared
-         * target page size are handled specially, so for those we
+        S1_ptw_translate * target page size are handled specially, so for those we
+         * pass in the exact addresses.
+         */
+        if (res.f.lg_page_size >= TARGET_PAGE_BITS) {
+            res.f.phys_addr &= TARGET_PAGE_MASK;
+            address &= TARGET_PAGE_MASK;
+        }
+
+        res.f.extra.arm.pte_attrs = res.cacheattrs.attrs;
+        res.f.extra.arm.shareability = res.cacheattrs.shareability;
+        //#ifdef TARGET_CRYPTO_CAP
+        //if (!(access_type==MMU_CC_DATA_LOAD || access_type==MMU_CC_DATA_STORE ))
+        //#endif
+        tlb_set_page_full(cs, mmu_idx, address, &res.f);
+
+        return true;
+    } else if (probe) {
+        return false;
+    } else {
+        /* now we have a real cpu fault */
+        cpu_restore_state(cs, retaddr);
+        arm_deliver_fault(cpu, address, access_type, mmu_idx, fi);
+    }
+}
+
+bool arm_cpu_tlb_skip_cc(CPUState *cs, vaddr address, int size,
+                      MMUAccessType access_type, int mmu_idx,
+                      bool probe, uintptr_t retaddr)
+{
+    ARMCPU *cpu = ARM_CPU(cs);
+    GetPhysAddrResult res = {};
+    ARMMMUFaultInfo local_fi, *fi;
+    int ret;
+
+    /*
+     * Allow S1_ptw_translate to see any fault generated here.
+     * Since this may recurse, read and clear.
+     */
+    fi = cpu->env.tlb_fi;
+    if (fi) {
+        cpu->env.tlb_fi = NULL;
+    } else {
+        fi = memset(&local_fi, 0, sizeof(local_fi));
+    }
+
+    /*
+     * Walk the page table and (if the mapping exists) add the page
+     * to the TLB.  On success, return true.  Otherwise, if probing,
+     * return false.  Otherwise populate fsr with ARM DFSR/IFSR fault
+     * register format, and signal the fault.
+     */
+    ret = get_phys_addr(&cpu->env, address, access_type,
+                        core_to_arm_mmu_idx(&cpu->env, mmu_idx),
+                        &res, fi);
+    if (likely(!ret)) {
+        /*
+         * Map a single [sub]page. Regions smaller than our declared
+        S1_ptw_translate * target page size are handled specially, so for those we
          * pass in the exact addresses.
          */
         if (res.f.lg_page_size >= TARGET_PAGE_BITS) {
@@ -371,6 +429,7 @@ bool arm_cpu_tlb_fill(CPUState *cs, vaddr address, int size,
         arm_deliver_fault(cpu, address, access_type, mmu_idx, fi);
     }
 }
+
 #else
 void arm_cpu_record_sigsegv(CPUState *cs, vaddr addr,
                             MMUAccessType access_type,
