@@ -967,6 +967,30 @@ static inline uint64_t regime_tcr(CPUARMState *env, ARMMMUIdx mmu_idx)
     return tcr;
 }
 
+/* Return the value of the TCR controlling this translation regime */
+static inline uint64_t regime_tcr_cc(CPUARMState *env, ARMMMUIdx mmu_idx)
+{
+    if (mmu_idx == ARMMMUIdx_Stage2) {
+        return env->cp15.vtcr_el2;
+    }
+    if (mmu_idx == ARMMMUIdx_Stage2_S) {
+        /*
+         * Secure stage 2 shares fields from VTCR_EL2. We merge those
+         * in with the VSTCR_EL2 value to synthesize a single VTCR_EL2 format
+         * value so the callers don't need to special case this.
+         *
+         * If a future architecture change defines bits in VSTCR_EL2 that
+         * overlap with these VTCR_EL2 fields we may need to revisit this.
+         */
+        uint64_t v = env->cp15.vstcr_el2 & ~VTCR_SHARED_FIELD_MASK;
+        v |= env->cp15.vtcr_el2 & VTCR_SHARED_FIELD_MASK;
+        return v;
+    }
+    //TODO: Add tcrs for other ELs
+    uint64_t tcr=env->cc_tcrel1;
+    return tcr;
+}
+
 /* Return true if the translation regime is using LPAE format page tables */
 static inline bool regime_using_lpae_format(CPUARMState *env, ARMMMUIdx mmu_idx)
 {
@@ -1383,6 +1407,10 @@ bool get_phys_addr(CPUARMState *env, target_ulong address,
                    GetPhysAddrResult *result, ARMMMUFaultInfo *fi)
     __attribute__((nonnull));
 
+bool get_phys_addr_cc(CPUARMState *env, target_ulong address,
+                   MMUAccessType access_type, ARMMMUIdx mmu_idx,
+                   GetPhysAddrResult *result, ARMMMUFaultInfo *fi)
+    __attribute__((nonnull));
 /**
  * get_phys_addr_with_space_nogpc: get the physical address for a virtual
  *                                 address

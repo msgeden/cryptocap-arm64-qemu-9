@@ -361,9 +361,6 @@ bool arm_cpu_tlb_fill(CPUState *cs, vaddr address, int size,
 
         res.f.extra.arm.pte_attrs = res.cacheattrs.attrs;
         res.f.extra.arm.shareability = res.cacheattrs.shareability;
-        //#ifdef TARGET_CRYPTO_CAP
-        //if (!(access_type==MMU_CC_DATA_LOAD || access_type==MMU_CC_DATA_STORE ))
-        //#endif
         tlb_set_page_full(cs, mmu_idx, address, &res.f);
 
         return true;
@@ -402,7 +399,7 @@ bool arm_cpu_tlb_skip_cc(CPUState *cs, vaddr address, int size,
      * return false.  Otherwise populate fsr with ARM DFSR/IFSR fault
      * register format, and signal the fault.
      */
-    ret = get_phys_addr(&cpu->env, address, access_type,
+    ret = get_phys_addr_cc(&cpu->env, address, access_type,
                         core_to_arm_mmu_idx(&cpu->env, mmu_idx),
                         &res, fi);
     if (likely(!ret)) {

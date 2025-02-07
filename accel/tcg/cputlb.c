@@ -1452,6 +1452,8 @@ void tlb_set_page_full_cc(CPUState *cpu, int mmu_idx,
      * vaddr we add back in io_prepare()/get_page_addr_code().
      */
     desc->fulltlb[index] = *full;
+   
+   
     full = &desc->fulltlb[index];
     full->xlat_section = iotlb - addr_page;
     full->phys_addr = paddr_page;
@@ -1778,20 +1780,16 @@ static int probe_access_internal_cc(CPUState *cpu, vaddr addr,
                                  void **phost, CPUTLBEntryFull **pfull,
                                  uintptr_t retaddr, bool check_mem_cbs)
 {
-    uintptr_t index = tlb_index(cpu, mmu_idx, addr);
-    CPUTLBEntry *entry = tlb_entry(cpu, mmu_idx, addr);
-    uint64_t tlb_addr = tlb_read_idx(entry, access_type);
+    uintptr_t index = tlb_index_cc(cpu, mmu_idx, addr);
+    CPUTLBEntry *entry = tlb_entry_cc(cpu, mmu_idx, addr);
+    uint64_t tlb_addr = tlb_read_idx_cc(entry, access_type);
     vaddr page_addr = addr & TARGET_PAGE_MASK;
     int flags = TLB_FLAGS_MASK & ~TLB_FORCE_SLOW;
     bool force_mmio = check_mem_cbs && cpu_plugin_mem_cbs_enabled(cpu);
     CPUTLBEntryFull *full;
     //TARGET_CRYPTO_CAP: TLB Miss
-    //#ifdef TARGET_CRYPTO_CAP
-    //if (true){
-    //    if (true){
-    if (!tlb_hit_page(tlb_addr, page_addr)) {
-        if (!victim_tlb_hit(cpu, mmu_idx, index, access_type, page_addr)) {
-    //#endif        
+    if (!tlb_hit_page_cc(tlb_addr, page_addr)) {
+        if (!victim_tlb_hit_cc(cpu, mmu_idx, index, access_type, page_addr)) {
             if (!cpu->cc->tcg_ops->tlb_fill(cpu, addr, fault_size, access_type,
                                             mmu_idx, nonfault, retaddr)) {
                 /* Non-faulting page table read failed.  */
@@ -1801,8 +1799,8 @@ static int probe_access_internal_cc(CPUState *cpu, vaddr addr,
             }
 
             /* TLB resize via tlb_fill may have moved the entry.  */
-            index = tlb_index(cpu, mmu_idx, addr);
-            entry = tlb_entry(cpu, mmu_idx, addr);
+            index = tlb_index_cc(cpu, mmu_idx, addr);
+            entry = tlb_entry_cc(cpu, mmu_idx, addr);
 
             /*
              * With PAGE_WRITE_INV, we set TLB_INVALID_MASK immediately,
@@ -1811,7 +1809,7 @@ static int probe_access_internal_cc(CPUState *cpu, vaddr addr,
              */
             flags &= ~TLB_INVALID_MASK;
         }
-        tlb_addr = tlb_read_idx(entry, access_type);
+        tlb_addr = tlb_read_idx_cc(entry, access_type);
     }
     flags &= tlb_addr;
 
@@ -2153,16 +2151,20 @@ static bool mmu_lookup1_cc(CPUState *cpu, MMULookupPageData *data,
                         int mmu_idx, MMUAccessType access_type, uintptr_t ra, uint64_t* haddr)
 {
     vaddr addr = data->addr;
-    uintptr_t index = tlb_index_cc(cpu, mmu_idx, addr);
-    CPUTLBEntry *entry = tlb_entry_cc(cpu, mmu_idx, addr);
-    uint64_t tlb_addr = tlb_read_idx_cc(entry, access_type);
+    uintptr_t index = tlb_index(cpu, mmu_idx, addr);
+    CPUTLBEntry *entry = tlb_entry(cpu, mmu_idx, addr);
+    uint64_t tlb_addr = tlb_read_idx(entry, access_type);
     bool maybe_resized = false;
     CPUTLBEntryFull *full;
     int flags;
 
     /* If the TLB entry is for a different page, reload and try again.  */
+    //#ifdef TARGET_CRYPTO_CAP
+    //if (true){
+    //    if (true){
     if (!tlb_hit_cc(tlb_addr, addr)) {
         if (!victim_tlb_hit_cc(cpu, mmu_idx, index, access_type, addr & TARGET_PAGE_MASK)) {
+    //#endif
             tlb_skip_cc(cpu, addr, data->size, access_type, mmu_idx, ra, haddr);
             maybe_resized = true;
             index = tlb_index_cc(cpu, mmu_idx, addr);
@@ -2170,7 +2172,6 @@ static bool mmu_lookup1_cc(CPUState *cpu, MMULookupPageData *data,
         }
         tlb_addr = tlb_read_idx_cc(entry, access_type) & ~TLB_INVALID_MASK;
     }
-
 
     full = &cpu->neg.tlb.d[mmu_idx].fulltlb[index];
     flags = tlb_addr & (TLB_FLAGS_MASK & ~TLB_FORCE_SLOW);
@@ -2180,7 +2181,7 @@ static bool mmu_lookup1_cc(CPUState *cpu, MMULookupPageData *data,
     data->flags = flags;
     /* Compute haddr speculatively; depending on flags it might be invalid. */
     data->haddr = (void *)((uintptr_t)addr + entry->addend);
-    
+
     return maybe_resized;
 }
 //#endif
@@ -2386,6 +2387,7 @@ static bool mmu_lookup_cc(CPUState *cpu, vaddr addr, MemOpIdx oi,
         cpu_unaligned_access(cpu, addr, type, l->mmu_idx, ra);
     }
 
+    //check whether the accessses bigger than 1 byte need to access two pages.
     l->page[0].addr = addr;
     l->page[0].size = memop_size(l->memop);
     l->page[1].addr = (addr + l->page[0].size - 1) & TARGET_PAGE_MASK;
@@ -2414,7 +2416,7 @@ static bool mmu_lookup_cc(CPUState *cpu, vaddr addr, MemOpIdx oi,
          */
         mmu_lookup1_cc(cpu, &l->page[0], l->mmu_idx, type, ra, haddr);
         if (mmu_lookup1_cc(cpu, &l->page[1], l->mmu_idx, type, ra, haddr)) {
-            uintptr_t index = tlb_index(cpu, l->mmu_idx, addr);
+            uintptr_t index = tlb_index_cc(cpu, l->mmu_idx, addr);
             l->page[0].full = &cpu->neg.tlb.d[l->mmu_idx].fulltlb[index];
         }
 
@@ -3001,7 +3003,6 @@ static uint8_t do_ld1_mmu_cc(CPUState *cpu, vaddr addr, MemOpIdx oi,
     uint64_t haddr;
     cpu_req_mo(TCG_MO_LD_LD | TCG_MO_ST_LD);
     crosspage = mmu_lookup_cc(cpu, addr, oi, ra, access_type, &l, &haddr);
-    //atomic_mmu_lookup(cpu, addr, oi, access_type, ra &l);
     //l.page[0].haddr = (void*)haddr;
     tcg_debug_assert(!crosspage);
     
