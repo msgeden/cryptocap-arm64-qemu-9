@@ -2313,31 +2313,80 @@ void HELPER(ccreate)(CPUARMState *env, uint64_t crd_idx, uint64_t perms_base, ui
 
 void HELPER(csetbase)(CPUARMState *env, uint64_t crd, uint64_t crs, uint64_t rs)    
 {
-    //  if (rs_base>((uint64_t)crs_size+crs_base)||rs_base<crs_base){
-    //     int syn = syn_data_abort_no_iss(arm_current_el(env) != 0, 0, 0, 0, 0, 1, 0x11);
-    //             raise_exception_ra(env, EXCP_DATA_ABORT, syn,
-    //                             exception_target_el(env), GETPC());
-    //  }
-     return;
+    //uint64_t tcr = env->tcr;
+    uint64_t tcr = 0;
+    //uint64_t tcr = env->cp15.ttbr0_ns; 
+    uint64_t crs_perms = env->ccregs[crs].perms_base;
+    crs_perms >>= 48;
+    crs_perms <<= 48;
+    
+    uint64_t crs_base=env->ccregs[crs].perms_base & 0x0000FFFFFFFFFFFF;
+    uint64_t new_base = env->xregs[rs] & 0x0000FFFFFFFFFFFF; 
+    if (new_base>((uint64_t)env->ccregs[crs].size+crs_base)
+        || new_base<crs_base 
+        || is_MAC_violation(tcr, env->ccregs[crs].perms_base, env->ccregs[crs].size, env->ccregs[crs].PT, env->ccregs[crs].MAC, env->mkey)){
+        int syn = syn_data_abort_no_iss(arm_current_el(env) != 0, 0, 0, 0, 0, 1, 0x11);
+        raise_exception_ra(env, EXCP_DATA_ABORT, syn, exception_target_el(env), GETPC());
+    }
+    else{
+        env->ccregs[crd].perms_base=(crs_perms|new_base);
+        env->ccregs[crd].offset=env->ccregs[crs].offset;
+        env->ccregs[crd].size=env->ccregs[crs].size;
+        env->ccregs[crd].PT=env->ccregs[crs].PT;
+        uint64_t newMAC=computeMAC(tcr, env->ccregs[crd].perms_base, env->ccregs[crd].PT, env->ccregs[crd].size, env->mkey);
+        env->ccregs[crd].MAC=newMAC;
+    }
+    return;
 }
 
 void HELPER(csetperms)(CPUARMState *env, uint64_t crd, uint64_t crs, uint64_t rs) 
 {
-    //  if (rs_perms>crs_perms){
-    //     int syn = syn_data_abort_no_iss(arm_current_el(env) != 0, 0, 0, 0, 0, 1, 0x11);
-    //             raise_exception_ra(env, EXCP_DATA_ABORT, syn,
-    //                             exception_target_el(env), GETPC());
-    //  }
-     return;
+    //uint64_t tcr = env->tcr;
+    uint64_t tcr = 0;
+    //uint64_t tcr = env->cp15.ttbr0_ns; 
+    uint64_t crs_perms = env->ccregs[crs].perms_base;
+    crs_perms >>= 48;
+    crs_perms <<= 48;
+    
+    uint64_t crs_base=env->ccregs[crs].perms_base & 0x0000FFFFFFFFFFFF;
+    uint64_t new_perms = env->xregs[rs] & 0xFFFF000000000000; 
+    new_perms>>=48;
+    if ((new_perms|crs_perms)>crs_perms
+        || is_MAC_violation(tcr, env->ccregs[crs].perms_base, env->ccregs[crs].size, env->ccregs[crs].PT, env->ccregs[crs].MAC, env->mkey)){
+        int syn = syn_data_abort_no_iss(arm_current_el(env) != 0, 0, 0, 0, 0, 1, 0x11);
+        raise_exception_ra(env, EXCP_DATA_ABORT, syn, exception_target_el(env), GETPC());
+    }
+    else{
+        env->ccregs[crd].perms_base=(new_perms|crs_base);
+        env->ccregs[crd].offset=env->ccregs[crs].offset;
+        env->ccregs[crd].size=env->ccregs[crs].size;
+        env->ccregs[crd].PT=env->ccregs[crs].PT;
+        uint64_t newMAC=computeMAC(tcr, env->ccregs[crd].perms_base, env->ccregs[crd].PT, env->ccregs[crd].size, env->mkey);
+        env->ccregs[crd].MAC=newMAC;
+    }
+    return;
 }
 
 void HELPER(csetsize)(CPUARMState *env, uint64_t crd, uint64_t crs, uint64_t rs)   
 {
-    //  if (rs_size>((uint64_t)crs_size)){
-    //     int syn = syn_data_abort_no_iss(arm_current_el(env) != 0, 0, 0, 0, 0, 1, 0x11);
-    //             raise_exception_ra(env, EXCP_DATA_ABORT, syn,
-    //                             exception_target_el(env), GETPC());
-    //  }
+    //uint64_t tcr = env->tcr;
+    uint64_t tcr = 0;
+    //uint64_t tcr = env->cp15.ttbr0_ns; 
+    uint32_t crs_size=env->ccregs[crs].size;
+    uint32_t new_size=(uint32_t)env->xregs[rs]; 
+    if (new_size>crs_size
+        || is_MAC_violation(tcr, env->ccregs[crs].perms_base, env->ccregs[crs].size, env->ccregs[crs].PT, env->ccregs[crs].MAC, env->mkey)){
+        int syn = syn_data_abort_no_iss(arm_current_el(env) != 0, 0, 0, 0, 0, 1, 0x11);
+        raise_exception_ra(env, EXCP_DATA_ABORT, syn, exception_target_el(env), GETPC());
+    }
+    else{
+        env->ccregs[crd].perms_base=env->ccregs[crs].perms_base;
+        env->ccregs[crd].offset=env->ccregs[crs].offset;
+        env->ccregs[crd].size=new_size;
+        env->ccregs[crd].PT=env->ccregs[crs].PT;
+        uint64_t newMAC=computeMAC(tcr, env->ccregs[crd].perms_base, env->ccregs[crd].PT, env->ccregs[crd].size, env->mkey);
+        env->ccregs[crd].MAC=newMAC;
+    }
      return;
 }
 void HELPER(stc)(CPUARMState *env, uint64_t cr_idx, uint64_t perms_base, uint32_t size, uint64_t PT)
@@ -2496,21 +2545,6 @@ void HELPER(cldg)(CPUARMState *env, uint64_t size_idx, uint64_t r_idx, uint64_t 
         tcr_el1&=0b1111111101111111111111100111111111111111111111111111111101111111;
         env->cp15.tcr_el[1]=tcr_el1;
 
-        // int mmu_idx = ARMMMUIdx_Stage1_EL0;  // Replace with the actual mmu_idx value
-
-        // // Perform the memory access
-        // uint64_t value;
-        // MMULookupPageData data;
-        // data.addr = addr;
-        // data.size = 8; // Example size
-
-        // // Force a page table walk
-        // if (!mmu_lookup1(env_cpu(env), &data, mmu_idx, MMU_DATA_LOAD, 0)) {
-        //     // Handle page table walk failure
-        //     //printf("Page table walk failed for address: 0x%lx\n", addr);
-        //     return;
-        // }
-        
         // tlb_flush(env_cpu(env));
         // arm_rebuild_hflags(env);
         
@@ -2526,6 +2560,7 @@ void HELPER(cldg)(CPUARMState *env, uint64_t size_idx, uint64_t r_idx, uint64_t 
                 break;
             case 3:
                 lvalue = cpu_ldub_data_cc(env, addr);
+                //lvalue = cpu_ldub_data(env, addr);
                 break;
             default:
                 lvalue = cpu_ldq_data(env, addr);

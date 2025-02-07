@@ -772,7 +772,7 @@ bool arm_cpu_tlb_fill(CPUState *cs, vaddr address, int size,
 
 bool arm_cpu_tlb_skip_cc(CPUState *cs, vaddr address, int size,
                       MMUAccessType access_type, int mmu_idx,
-                      bool probe, uintptr_t retaddr);
+                      bool probe, uintptr_t retaddr, uint64_t* haddr);
 #endif
 
 static inline int arm_to_core_mmu_idx(ARMMMUIdx mmu_idx)

@@ -223,7 +223,6 @@ static uint64_t regime_ttbr(CPUARMState *env, ARMMMUIdx mmu_idx, int ttbrn)
 /* Return the TTBR associated with this translation regime */
 static uint64_t regime_ttbr_cc(CPUARMState *env, ARMMMUIdx mmu_idx, int ttbrn)
 {
-    //env->cp15.tcr_el[1]=env->cc_tcrel1;
     return env->cc_ttbr0;
 }
 /* Return true if the specified stage of address translation is disabled */

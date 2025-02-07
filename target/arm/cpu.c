@@ -2502,6 +2502,7 @@ static const TCGCPUOps arm_tcg_ops = {
     .record_sigbus = arm_cpu_record_sigbus,
 #else
     .tlb_fill = arm_cpu_tlb_fill,
+    .tlb_skip_cc = arm_cpu_tlb_skip_cc,
     .cpu_exec_interrupt = arm_cpu_exec_interrupt,
     .do_interrupt = arm_cpu_do_interrupt,
     .do_transaction_failed = arm_cpu_do_transaction_failed,

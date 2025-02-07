@@ -374,11 +374,7 @@ QEMU_BUILD_BUG_ON(TLB_FLAGS_MASK & TLB_SLOW_FLAGS_MASK);
  */
 static inline bool tlb_hit_page(uint64_t tlb_addr, vaddr addr)
 {
-//#ifdef TARGET_CRYPTO_CAP
-//    return false;
-//#endif
-    bool res=(addr == (tlb_addr & (TARGET_PAGE_MASK | TLB_INVALID_MASK)));
-    return res;
+    return (addr == (tlb_addr & (TARGET_PAGE_MASK | TLB_INVALID_MASK)));
 }
 
 /**
@@ -389,10 +385,32 @@ static inline bool tlb_hit_page(uint64_t tlb_addr, vaddr addr)
  */
 static inline bool tlb_hit(uint64_t tlb_addr, vaddr addr)
 {
-//#ifdef TARGET_CRYPTO_CAP
-//    return false;
-//#endif
     return tlb_hit_page(tlb_addr, addr & TARGET_PAGE_MASK);
+}
+
+
+/**
+ * tlb_hit_page: return true if page aligned @addr is a hit against the
+ * TLB entry @tlb_addr
+ *
+ * @addr: virtual address to test (must be page aligned)
+ * @tlb_addr: TLB entry address (a CPUTLBEntry addr_read/write/code value)
+ */
+static inline bool tlb_hit_page_cc(uint64_t tlb_addr, vaddr addr)
+{
+    return (addr == (tlb_addr & (TARGET_PAGE_MASK | TLB_INVALID_MASK)));
+}
+
+/**
+ * tlb_hit: return true if @addr is a hit against the TLB entry @tlb_addr
+ *
+ * @addr: virtual address to test (need not be page aligned)
+ * @tlb_addr: TLB entry address (a CPUTLBEntry addr_read/write/code value)
+ */
+static inline bool tlb_hit_cc(uint64_t tlb_addr, vaddr addr)
+{
+    //removes the offset bits here
+    return tlb_hit_page_cc(tlb_addr, addr & TARGET_PAGE_MASK);
 }
 
 #endif /* !CONFIG_USER_ONLY */

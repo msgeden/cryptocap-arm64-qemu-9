@@ -378,7 +378,7 @@ bool arm_cpu_tlb_fill(CPUState *cs, vaddr address, int size,
 
 bool arm_cpu_tlb_skip_cc(CPUState *cs, vaddr address, int size,
                       MMUAccessType access_type, int mmu_idx,
-                      bool probe, uintptr_t retaddr)
+                      bool probe, uintptr_t retaddr, uint64_t* haddr)
 {
     ARMCPU *cpu = ARM_CPU(cs);
     GetPhysAddrResult res = {};
@@ -418,8 +418,9 @@ bool arm_cpu_tlb_skip_cc(CPUState *cs, vaddr address, int size,
 
         res.f.extra.arm.pte_attrs = res.cacheattrs.attrs;
         res.f.extra.arm.shareability = res.cacheattrs.shareability;
-
-        tlb_set_page_full(cs, mmu_idx, address, &res.f);
+        
+        tlb_set_page_full_cc(cs, mmu_idx, address, &res.f, access_type);
+        
         return true;
     } else if (probe) {
         return false;

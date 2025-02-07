@@ -132,7 +132,7 @@ struct TCGCPUOps {
      */
     bool (*tlb_skip_cc)(CPUState *cpu, vaddr address, int size,
                      MMUAccessType access_type, int mmu_idx,
-                     bool probe, uintptr_t retaddr);  
+                     bool probe, uintptr_t retaddr, uint64_t* haddr);  
                                         
     /**
      * @do_transaction_failed: Callback for handling failed memory transactions

@@ -1595,6 +1595,7 @@ static bool trans_CMANIP(DisasContext *s, arg_CMANIP *a)
     }
     return true;
 }
+
 static bool trans_CMOV(DisasContext *s, arg_CMOV *a)
 {
     tcg_gen_mov_i64(cpu_CC[a->crd].perms_base, cpu_CC[a->crs].perms_base);
@@ -1643,79 +1644,6 @@ static bool trans_CSETPERMS(DisasContext *s, arg_CSETPERMS *a)
 
     return true;
 }
-// static bool trans_CSETBASE(DisasContext *s, arg_CSETBASE *a)
-// {
-    
-//     TCGv_i64 Rs_base = cpu_X[a->rs];
-//     TCGv_i64 CRs_perms_base = cpu_CC[a->crs].perms_base;
-//     TCGv_i64 CRd_perms_base = cpu_CC[a->crd].perms_base;
-    
-//     TCGv_i32 CRs_size = cpu_CC[a->crs].size;
-//     TCGv_i64 CRs_base=tcg_temp_new_i64();
-//     TCGv_i64 CRs_perms=tcg_temp_new_i64();
-    
-//     tcg_gen_andi_i64(CRs_base, CRs_perms_base, 0x0000FFFFFFFFFFFF);
-    
-//     //extract upper 16-bits from CRs.perms_base
-//     tcg_gen_shri_i64(CRs_perms, CRs_perms_base, 48);
-//     tcg_gen_shli_i64(CRs_perms, CRs_perms, 48);
-
-//     //extract lower 48-bit from Rs
-//     tcg_gen_andi_i64(CRd_perms_base, Rs_base, 0x0000FFFFFFFFFFFF);
-    
-//     // combine the results
-//     tcg_gen_or_i64(CRd_perms_base, CRd_perms_base, CRs_perms);
-
-//     // take other fields from CRs 
-//     tcg_gen_mov_i32(cpu_CC[a->crd].offset, cpu_CC[a->crs].offset);
-//     tcg_gen_mov_i32(cpu_CC[a->crd].size, cpu_CC[a->crs].size);
-//     tcg_gen_mov_i64(cpu_CC[a->crd].PT, cpu_CC[a->crs].PT);
-//     tcg_gen_mov_i64(cpu_CC[a->crd].MAC, cpu_CC[a->crs].MAC);
-
-//     return true;
-// }
-// static bool trans_CSETSIZE(DisasContext *s, arg_CSETSIZE *a)
-// {   
-//     TCGv_i64 Rs_size = cpu_X[a->rs];
-//     TCGv_i32 CRs_size = cpu_CC[a->crs].size;
-
-//     //replace size field
-//     tcg_gen_mov_i32(cpu_CC[a->crd].size, TCGV_LOWER(Rs_size));
-    
-//     // take other fields from CRs 
-//     tcg_gen_mov_i64(cpu_CC[a->crd].perms_base, cpu_CC[a->crs].perms_base);
-//     tcg_gen_mov_i32(cpu_CC[a->crd].offset, cpu_CC[a->crs].offset);
-//     tcg_gen_mov_i64(cpu_CC[a->crd].PT, cpu_CC[a->crs].PT);
-//     tcg_gen_mov_i64(cpu_CC[a->crd].MAC, cpu_CC[a->crs].MAC);
-
-//     return true;
-// }
-// static bool trans_CSETPERMS(DisasContext *s, arg_CSETPERMS *a)
-// {
-//     TCGv_i64 Rs_perms = cpu_X[a->rs];
-//     TCGv_i64 CRs_perms_base = cpu_CC[a->crs].perms_base;
-//     TCGv_i64 CRd_perms_base = cpu_CC[a->crd].perms_base;
-//     TCGv_i64 tmp=tcg_temp_new_i64();
-//     TCGv_i64 CRs_perms=tcg_temp_new_i64();
-  
-//     tcg_gen_andi_i64(CRs_perms, CRs_perms_base, 0xFFFF000000000000);
-//     tcg_gen_shri_i64(CRs_perms, CRs_perms, 48);
-
-//     //extract the upper 16-bit
-//     tcg_gen_shli_i64(tmp, Rs_perms, 48);
-//     tcg_gen_andi_i64(tmp, tmp, 0xFFFF000000000000);
-
-//     // combine the results
-//     tcg_gen_or_i64(CRd_perms_base, CRs_perms_base, tmp);
-
-//     // take other fields from CRs 
-//     tcg_gen_mov_i32(cpu_CC[a->crd].offset, cpu_CC[a->crs].offset);
-//     tcg_gen_mov_i32(cpu_CC[a->crd].size, cpu_CC[a->crs].size);
-//     tcg_gen_mov_i64(cpu_CC[a->crd].PT, cpu_CC[a->crs].PT);
-//     tcg_gen_mov_i64(cpu_CC[a->crd].MAC, cpu_CC[a->crs].MAC);
-    
-//     return true;
-// }
 
 static bool trans_CSETADDR(DisasContext *s, arg_CSETADDR *a)
 {
@@ -1733,7 +1661,6 @@ static bool trans_CSETADDR(DisasContext *s, arg_CSETADDR *a)
     return true;
 }
 
-
 static bool trans_CCREATE(DisasContext *s, arg_CCREATE *a)
 {   
     TCGv_i64 Rs_perms_base = cpu_X[a->rs1];
@@ -1746,18 +1673,14 @@ static bool trans_CCREATE(DisasContext *s, arg_CCREATE *a)
     return true;
 }
 
-// static bool trans_CSETPT(DisasContext *s, arg_CSETPT *a)
-// {
-//     //replace PT field
-//     tcg_gen_mov_i64(cpu_CC[a->crd].PT, cpu_X[a->rs]);
+static bool trans_CINCOFFSET(DisasContext *s, arg_CINCOFFSET *a)
+{
+    TCGv_i32 offset = tcg_temp_new_i32();
 
-//     // take other fields from CRs 
-//     tcg_gen_mov_i64(cpu_CC[a->crd].perms_base, cpu_CC[a->crs].perms_base);
-//     tcg_gen_mov_i32(cpu_CC[a->crd].offset, cpu_CC[a->crs].offset);
-//     tcg_gen_mov_i32(cpu_CC[a->crd].size, cpu_CC[a->crs].size);
-//     tcg_gen_mov_i64(cpu_CC[a->crd].MAC, cpu_CC[a->crs].MAC);
-//     return true;
-// }
+    tcg_gen_addi_i32(cpu_CC[a->crd].offset, cpu_CC[a->crd].offset,  a->imm);
+
+    return true;
+}
 
 static bool trans_CSIGN(DisasContext *s, arg_CSIGN *a)
 {
@@ -1769,12 +1692,12 @@ static bool trans_CSIGN(DisasContext *s, arg_CSIGN *a)
     return true;
 }
 
-static bool trans_READSPEL1(DisasContext *s, arg_READSPEL1 *a)
-{
-    tcg_gen_mov_i64(cpu_X[a->rs], cpu_sp_el1);
+// static bool trans_READSPEL1(DisasContext *s, arg_READSPEL1 *a)
+// {
+//     tcg_gen_mov_i64(cpu_X[a->rs], cpu_sp_el1);
     
-    return true;
-}
+//     return true;
+// }
 static bool trans_UPDTCR(DisasContext *s, arg_UPDTCR *a)
 {
     //check exception level here

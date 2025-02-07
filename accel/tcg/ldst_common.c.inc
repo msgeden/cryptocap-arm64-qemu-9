@@ -552,7 +552,9 @@ uint8_t cpu_ldb_mmu_cc(CPUArchState *env, abi_ptr addr, MemOpIdx oi, uintptr_t r
     uint8_t ret;
 
     tcg_debug_assert((get_memop(oi) & MO_SIZE) == MO_UB);
-    ret = do_ld1_mmu_cc(env_cpu(env), addr, oi, ra, MMU_CC_DATA_LOAD);
+    //ret = do_ld1_mmu_cc(env_cpu(env), addr, oi, ra, MMU_CC_DATA_LOAD);
+    ret = do_ld1_mmu_cc(env_cpu(env), addr, oi, ra, MMU_DATA_LOAD);
+
     plugin_load_cb(env, addr, oi);
     return ret;
 }

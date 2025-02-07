@@ -37,6 +37,7 @@
 &idx_rw_cc_r idx rw cc r
 &cc cc
 &crd_rs1_rs2 crd rs1 rs2  
+&crd_imm crd imm
 
 #OPERATION TYPES
 @op_idx_rw_crd_rs       ... .... ..... ..... . idx:3 rw:1 crd:5 rs:5 &idx_rw_crd_rs
@@ -54,7 +55,7 @@
 @op_idx_rw_cc_r         ... .... ..... ..... ..  idx:4 rw:1 cc:3 r:5 &idx_rw_cc_r
 @op_cc                  ... .... ..... ..... ..... ..... .. cc:3 &cc
 @op_crd_rs1_rs2         ... .... ..... ..... crd:5 rs1:5 rs2:5 &crd_rs1_rs2
-
+@op_crd_imm             ... .... ..... ..... ..... crd:5 imm:5 &crd_imm
 
 #CAPABILITY MANIPULATION INSTRUCTIONS
 #a generic capability register manipulation instruction based on index (idx)
@@ -66,8 +67,8 @@ CSETPERMS   000 0001 00111 00000 ..... ..... .....  @op_crd_crs_rs
 CSETADDR    000 0001 01000 00000 ..... ..... .....  @op_crd_crs_rs
 CSIGN       000 0001 01001 00000 00000 00000 .....  @op_crs
 #this is an illegal/temporary user instruction placed for debug purposes, which will require EL1 privileges later.
-#CSETPT      000 0001 10100 00000 ..... ..... .....  @op_crd_crs_rs
-CCREATE      000 0001 10100 00000 ..... ..... .....  @op_crd_rs1_rs2
+CINCOFFSET  000 0001 11100 00000 00000 ..... .....  @op_crd_imm
+CCREATE     000 0001 10100 00000 ..... ..... .....  @op_crd_rs1_rs2
 
 
 #OTHER INSTRUCTIONS
@@ -101,7 +102,7 @@ CRET        000 0001 01110 00000 00000 00000 00000  @op_nill
 #EL1 -> EL0
 CJMP        000 0001 10101 00000 00000 00000 00000  @op_nill
 
-READSPEL1   000 0001 11100 00000 00000 00000 .....  @op_rs
+#READSPEL1   000 0001 11100 00000 00000 00000 .....  @op_rs
 
 CMOVCL      000 0001 10110 00000 00 .... . ... ..... @op_idx_rw_cc_r
 CSIGNCL     000 0001 10111 00000 00000 00000 00 ...  @op_cc
