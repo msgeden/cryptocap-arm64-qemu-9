@@ -82,7 +82,7 @@ static bool get_phys_addr_nogpc_cc(CPUARMState *env, S1Translate *ptw,
                                 target_ulong address,
                                 MMUAccessType access_type,
                                 GetPhysAddrResult *result,
-                                ARMMMUFaultInfo *fi);
+                                ARMMMUFaultInfo *fi, CPUTLB* tlb_skipped);
 
 
 static bool get_phys_addr_gpc(CPUARMState *env, S1Translate *ptw,
@@ -96,7 +96,7 @@ static bool get_phys_addr_gpc_cc(CPUARMState *env, S1Translate *ptw,
                               target_ulong address,
                               MMUAccessType access_type,
                               GetPhysAddrResult *result,
-                              ARMMMUFaultInfo *fi);
+                              ARMMMUFaultInfo *fi, CPUTLB* tlb_skipped);
 
 /* This mapping is common between ID_AA64MMFR0.PARANGE and TCR_ELx.{I}PS. */
 static const uint8_t pamax_map[] = {
@@ -667,14 +667,15 @@ static bool S1_ptw_translate(CPUARMState *env, S1Translate *ptw,
 //#ifdef TARGET_CRYPTO_CAP
 /* Translate a S1 pagetable walk through S2 if needed.  */
 static bool S1_ptw_translate_cc(CPUARMState *env, S1Translate *ptw,
-                             hwaddr addr, ARMMMUFaultInfo *fi)
+                             hwaddr addr, ARMMMUFaultInfo *fi, CPUTLB* tlb_skipped)
 {
     ARMMMUIdx mmu_idx = ptw->in_mmu_idx;
     ARMMMUIdx s2_mmu_idx = ptw->in_ptw_idx;
     uint8_t pte_attrs;
 
     ptw->out_virt = addr;
-    if (unlikely(ptw->in_debug)) {
+    if (true) { 
+    //if (unlikely(ptw->in_debug)) {
         /*
          * From gdbstub, do not use softmmu so that we don't modify the
          * state of the cpu at all, including softmmu tlb contents.
@@ -688,7 +689,7 @@ static bool S1_ptw_translate_cc(CPUARMState *env, S1Translate *ptw,
         };
         GetPhysAddrResult s2 = { };
 
-        if (get_phys_addr_gpc(env, &s2ptw, addr, MMU_CC_DATA_LOAD, &s2, fi)) {
+        if (get_phys_addr_gpc_cc(env, &s2ptw, addr, MMU_DATA_LOAD, &s2, fi, tlb_skipped)) {
             goto fail;
         }
 
@@ -704,9 +705,9 @@ static bool S1_ptw_translate_cc(CPUARMState *env, S1Translate *ptw,
         int flags;
 
         env->tlb_fi = fi;
-        flags = probe_access_full_mmu_cc(env, addr, 0, MMU_CC_DATA_LOAD,
+        flags = probe_access_full_mmu_cc(env, addr, 0, MMU_DATA_LOAD,
                                       arm_to_core_mmu_idx(s2_mmu_idx),
-                                      &ptw->out_host, &full);
+                                      &ptw->out_host, &full, tlb_skipped);
         env->tlb_fi = NULL;
 
         if (unlikely(flags & TLB_INVALID_MASK)) {
@@ -2335,7 +2336,7 @@ static bool get_phys_addr_lpae(CPUARMState *env, S1Translate *ptw,
 static bool get_phys_addr_lpae_cc(CPUARMState *env, S1Translate *ptw,
                                uint64_t address,
                                MMUAccessType access_type,
-                               GetPhysAddrResult *result, ARMMMUFaultInfo *fi)
+                               GetPhysAddrResult *result, ARMMMUFaultInfo *fi, CPUTLB* tlb_skipped)
 {
     ARMCPU *cpu = env_archcpu(env);
     ARMMMUIdx mmu_idx = ptw->in_mmu_idx;
@@ -2348,7 +2349,7 @@ static bool get_phys_addr_lpae_cc(CPUARMState *env, S1Translate *ptw,
     uint64_t attrs;
     int32_t stride;
     int addrsize, inputsize, outputsize;
-    uint64_t tcr = regime_tcr(env, mmu_idx);
+    uint64_t tcr = regime_tcr_cc(env, mmu_idx);
     int ap, xn, pxn;
     uint32_t el = regime_el(env, mmu_idx);
     uint64_t descaddrmask;
@@ -2542,7 +2543,7 @@ static bool get_phys_addr_lpae_cc(CPUARMState *env, S1Translate *ptw,
     }
 
 
-    if (!S1_ptw_translate_cc(env, ptw, descaddr, fi)) {
+    if (!S1_ptw_translate_cc(env, ptw, descaddr, fi, tlb_skipped)) {
             goto do_fault;
     }
     
@@ -2750,8 +2751,8 @@ static bool get_phys_addr_lpae_cc(CPUARMState *env, S1Translate *ptw,
     }
 
 //#ifdef TARGET_CRYPTO_CAP
-    if (access_type!=MMU_CC_DATA_LOAD && access_type!=MMU_CC_DATA_STORE && !(result->f.prot & (1 << access_type))) {
-    //if (!(result->f.prot & (1 << access_type))) {
+//  if (access_type!=MMU_CC_DATA_LOAD && access_type!=MMU_CC_DATA_STORE && !(result->f.prot & (1 << access_type))) {
+    if (!(result->f.prot & (1 << access_type))) {
 //#endif
         fi->type = ARMFault_Permission;
         goto do_fault;
@@ -4196,7 +4197,7 @@ static bool get_phys_addr_nogpc_cc(CPUARMState *env, S1Translate *ptw,
                                       target_ulong address,
                                       MMUAccessType access_type,
                                       GetPhysAddrResult *result,
-                                      ARMMMUFaultInfo *fi)
+                                      ARMMMUFaultInfo *fi, CPUTLB* tlb_skipped)
 {
     ARMMMUIdx mmu_idx = ptw->in_mmu_idx;
     ARMMMUIdx s1_mmu_idx;
@@ -4320,7 +4321,7 @@ static bool get_phys_addr_nogpc_cc(CPUARMState *env, S1Translate *ptw,
     }
 
     if (regime_using_lpae_format(env, mmu_idx)) {
-        return get_phys_addr_lpae_cc(env, ptw, address, access_type, result, fi);
+        return get_phys_addr_lpae_cc(env, ptw, address, access_type, result, fi, tlb_skipped);
     } else if (arm_feature(env, ARM_FEATURE_V7) ||
                regime_sctlr(env, mmu_idx) & SCTLR_XP) {
         return get_phys_addr_v6(env, ptw, address, access_type, result, fi);
@@ -4350,9 +4351,9 @@ static bool get_phys_addr_gpc_cc(CPUARMState *env, S1Translate *ptw,
                               target_ulong address,
                               MMUAccessType access_type,
                               GetPhysAddrResult *result,
-                              ARMMMUFaultInfo *fi)
+                              ARMMMUFaultInfo *fi, CPUTLB* tlb_skipped)
 {
-    if (get_phys_addr_nogpc_cc(env, ptw, address, access_type, result, fi)) {
+    if (get_phys_addr_nogpc_cc(env, ptw, address, access_type, result, fi, tlb_skipped)) {
         return true;
     }
     if (!granule_protection_check(env, result->f.phys_addr,
@@ -4448,7 +4449,7 @@ bool get_phys_addr(CPUARMState *env, target_ulong address,
 
 bool get_phys_addr_cc(CPUARMState *env, target_ulong address,
                    MMUAccessType access_type, ARMMMUIdx mmu_idx,
-                   GetPhysAddrResult *result, ARMMMUFaultInfo *fi)
+                   GetPhysAddrResult *result, ARMMMUFaultInfo *fi, CPUTLB* tlb_skipped)
 {
     S1Translate ptw = {
         .in_mmu_idx = mmu_idx,
@@ -4512,7 +4513,7 @@ bool get_phys_addr_cc(CPUARMState *env, target_ulong address,
     }
 
     ptw.in_space = ss;
-    return get_phys_addr_gpc_cc(env, &ptw, address, access_type, result, fi);
+    return get_phys_addr_gpc_cc(env, &ptw, address, access_type, result, fi, tlb_skipped);
 }
 
 hwaddr arm_cpu_get_phys_page_attrs_debug(CPUState *cs, vaddr addr,

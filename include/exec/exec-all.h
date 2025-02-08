@@ -265,7 +265,7 @@ void tlb_set_page_full(CPUState *cpu, int mmu_idx, vaddr addr,
  * used by tlb_flush_page.
  */
 void tlb_set_page_full_cc(CPUState *cpu, int mmu_idx, vaddr addr,
-                       CPUTLBEntryFull *full, MMUAccessType access_type);
+                       CPUTLBEntryFull *full, MMUAccessType access_type, CPUTLB* tlb_skipped, CPUTLBEntry* entry);
 /**
  * tlb_set_page_with_attrs:
  * @cpu: CPU to add this TLB entry for
@@ -481,7 +481,7 @@ int probe_access_full_mmu(CPUArchState *env, vaddr addr, int size,
 //#ifdef TARGET_CRYTPO_CAP
 int probe_access_full_mmu_cc(CPUArchState *env, vaddr addr, int size,
                           MMUAccessType access_type, int mmu_idx,
-                          void **phost, CPUTLBEntryFull **pfull);
+                          void **phost, CPUTLBEntryFull **pfull, CPUTLB* tlb_skipped);
 //#endif
 #endif
 

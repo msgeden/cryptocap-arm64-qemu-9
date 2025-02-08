@@ -375,7 +375,7 @@ bool arm_cpu_tlb_fill(CPUState *cs, vaddr address, int size,
 
 bool arm_cpu_tlb_skip_cc(CPUState *cs, vaddr address, int size,
                       MMUAccessType access_type, int mmu_idx,
-                      bool probe, uintptr_t retaddr, uint64_t* haddr)
+                      bool probe, uintptr_t retaddr, CPUTLB* tlb_skipped, CPUTLBEntryFull* full, CPUTLBEntry* entry)
 {
     ARMCPU *cpu = ARM_CPU(cs);
     GetPhysAddrResult res = {};
@@ -401,7 +401,7 @@ bool arm_cpu_tlb_skip_cc(CPUState *cs, vaddr address, int size,
      */
     ret = get_phys_addr_cc(&cpu->env, address, access_type,
                         core_to_arm_mmu_idx(&cpu->env, mmu_idx),
-                        &res, fi);
+                        &res, fi, tlb_skipped);
     if (likely(!ret)) {
         /*
          * Map a single [sub]page. Regions smaller than our declared
@@ -416,7 +416,8 @@ bool arm_cpu_tlb_skip_cc(CPUState *cs, vaddr address, int size,
         res.f.extra.arm.pte_attrs = res.cacheattrs.attrs;
         res.f.extra.arm.shareability = res.cacheattrs.shareability;
         
-        tlb_set_page_full_cc(cs, mmu_idx, address, &res.f, access_type);
+        *full=res.f;
+        tlb_set_page_full_cc(cs, mmu_idx, address, full, access_type, tlb_skipped, entry);
         
         return true;
     } else if (probe) {

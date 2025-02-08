@@ -772,7 +772,7 @@ bool arm_cpu_tlb_fill(CPUState *cs, vaddr address, int size,
 
 bool arm_cpu_tlb_skip_cc(CPUState *cs, vaddr address, int size,
                       MMUAccessType access_type, int mmu_idx,
-                      bool probe, uintptr_t retaddr, uint64_t* haddr);
+                      bool probe, uintptr_t retaddr, CPUTLB* tlb_skipped, CPUTLBEntryFull* full, CPUTLBEntry* entry);
 #endif
 
 static inline int arm_to_core_mmu_idx(ARMMMUIdx mmu_idx)
@@ -1409,7 +1409,7 @@ bool get_phys_addr(CPUARMState *env, target_ulong address,
 
 bool get_phys_addr_cc(CPUARMState *env, target_ulong address,
                    MMUAccessType access_type, ARMMMUIdx mmu_idx,
-                   GetPhysAddrResult *result, ARMMMUFaultInfo *fi)
+                   GetPhysAddrResult *result, ARMMMUFaultInfo *fi, CPUTLB* tlb_skipped)
     __attribute__((nonnull));
 /**
  * get_phys_addr_with_space_nogpc: get the physical address for a virtual

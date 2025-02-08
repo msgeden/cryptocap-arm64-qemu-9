@@ -1102,9 +1102,9 @@ static void tlb_add_large_page(CPUState *cpu, int mmu_idx,
 /* Our TLB does not support large pages, so remember the area covered by
    large pages and trigger a full TLB flush if these are invalidated.  */
 static void tlb_add_large_page_cc(CPUState *cpu, int mmu_idx,
-                               vaddr addr, uint64_t size)
+                               vaddr addr, uint64_t size, CPUTLB* tlb_skipped)
 {
-    vaddr lp_addr = cpu->neg.tlb.d[mmu_idx].large_page_addr;
+    vaddr lp_addr = tlb_skipped->d[mmu_idx].large_page_addr;
     vaddr lp_mask = ~(size - 1);
 
     if (lp_addr == (vaddr)-1) {
@@ -1114,13 +1114,13 @@ static void tlb_add_large_page_cc(CPUState *cpu, int mmu_idx,
         /* Extend the existing region to include the new page.
            This is a compromise between unnecessary flushes and
            the cost of maintaining a full variable size TLB.  */
-        lp_mask &= cpu->neg.tlb.d[mmu_idx].large_page_mask;
+        lp_mask &= tlb_skipped->d[mmu_idx].large_page_mask;
         while (((lp_addr ^ addr) & lp_mask) != 0) {
             lp_mask <<= 1;
         }
     }
-    cpu->neg.tlb.d[mmu_idx].large_page_addr = lp_addr & lp_mask;
-    cpu->neg.tlb.d[mmu_idx].large_page_mask = lp_mask;
+    tlb_skipped->d[mmu_idx].large_page_addr = lp_addr & lp_mask;
+    tlb_skipped->d[mmu_idx].large_page_mask = lp_mask;
 }
 
 static inline void tlb_set_compare(CPUTLBEntryFull *full, CPUTLBEntry *ent,
@@ -1321,10 +1321,14 @@ void tlb_set_page_full(CPUState *cpu, int mmu_idx,
  * critical section.
  */
 void tlb_set_page_full_cc(CPUState *cpu, int mmu_idx,
-                       vaddr addr, CPUTLBEntryFull *full, MMUAccessType access_type)
+                       vaddr addr, CPUTLBEntryFull *full, MMUAccessType access_type, CPUTLB* tlb_skipped, CPUTLBEntry* entry)
 {
-    CPUTLB *tlb = &cpu->neg.tlb;
+    CPUTLB *tlb = tlb_skipped;
     CPUTLBDesc *desc = &tlb->d[mmu_idx];
+
+    //CPUTLB *tlb = &cpu->neg.tlb;
+    //CPUTLBDesc *desc = &tlb->d[mmu_idx];
+
     MemoryRegionSection *section;
     unsigned int index, read_flags, write_flags;
     uintptr_t addend;
@@ -1340,7 +1344,7 @@ void tlb_set_page_full_cc(CPUState *cpu, int mmu_idx,
         sz = TARGET_PAGE_SIZE;
     } else {
         sz = (hwaddr)1 << full->lg_page_size;
-        tlb_add_large_page_cc(cpu, mmu_idx, addr, sz);
+        tlb_add_large_page_cc(cpu, mmu_idx, addr, sz, tlb_skipped);
     }
     addr_page = addr & TARGET_PAGE_MASK;
     paddr_page = full->phys_addr & TARGET_PAGE_MASK;
@@ -1404,8 +1408,8 @@ void tlb_set_page_full_cc(CPUState *cpu, int mmu_idx,
     wp_flags = cpu_watchpoint_address_matches(cpu, addr_page,
                                               TARGET_PAGE_SIZE);
 
-    index = tlb_index_cc(cpu, mmu_idx, addr_page);
-    te = tlb_entry_cc(cpu, mmu_idx, addr_page);
+    index = tlb_index_cc(cpu, mmu_idx, addr_page, tlb_skipped);
+    te = tlb_entry_cc(cpu, mmu_idx, addr_page, tlb_skipped);
 
     /*
      * Hold the TLB lock for the rest of the function. We could acquire/release
@@ -1422,41 +1426,41 @@ void tlb_set_page_full_cc(CPUState *cpu, int mmu_idx,
     /* Make sure there's no cached translation for the new page.  */
     tlb_flush_vtlb_page_locked(cpu, mmu_idx, addr_page);
 
-    /*
-     * Only evict the old entry to the victim tlb if it's for a
-     * different page; otherwise just overwrite the stale data.
-     */
-    if (!tlb_hit_page_anyprot(te, addr_page) && !tlb_entry_is_empty(te)) {
-        unsigned vidx = desc->vindex++ % CPU_VTLB_SIZE;
-        CPUTLBEntry *tv = &desc->vtable[vidx];
+    // /*
+    //  * Only evict the old entry to the victim tlb if it's for a
+    //  * different page; otherwise just overwrite the stale data.
+    //  */
+    // if (!tlb_hit_page_anyprot(te, addr_page) && !tlb_entry_is_empty(te)) {
+    //     unsigned vidx = desc->vindex++ % CPU_VTLB_SIZE;
+    //     CPUTLBEntry *tv = &desc->vtable[vidx];
 
-        /* Evict the old entry into the victim tlb.  */
-        copy_tlb_helper_locked(tv, te);
-        desc->vfulltlb[vidx] = desc->fulltlb[index];
-        tlb_n_used_entries_dec(cpu, mmu_idx);
-    }
+    //     /* Evict the old entry into the victim tlb.  */
+    //     copy_tlb_helper_locked(tv, te);
+    //     desc->vfulltlb[vidx] = desc->fulltlb[index];
+    //     tlb_n_used_entries_dec(cpu, mmu_idx);
+    // }
 
-    /* refill the tlb */
-    /*
-     * When memory region is ram, iotlb contains a TARGET_PAGE_BITS
-     * aligned ram_addr_t of the page base of the target RAM.
-     * Otherwise, iotlb contains
-     *  - a physical section number in the lower TARGET_PAGE_BITS
-     *  - the offset within section->mr of the page base (I/O, ROMD) with the
-     *    TARGET_PAGE_BITS masked off.
-     * We subtract addr_page (which is page aligned and thus won't
-     * disturb the low bits) to give an offset which can be added to the
-     * (non-page-aligned) vaddr of the eventual memory access to get
-     * the MemoryRegion offset for the access. Note that the vaddr we
-     * subtract here is that of the page base, and not the same as the
-     * vaddr we add back in io_prepare()/get_page_addr_code().
-     */
-    desc->fulltlb[index] = *full;
-   
-   
-    full = &desc->fulltlb[index];
+    // /* refill the tlb */
+    // /*
+    //  * When memory region is ram, iotlb contains a TARGET_PAGE_BITS
+    //  * aligned ram_addr_t of the page base of the target RAM.
+    //  * Otherwise, iotlb contains
+    //  *  - a physical section number in the lower TARGET_PAGE_BITS
+    //  *  - the offset within section->mr of the page base (I/O, ROMD) with the
+    //  *    TARGET_PAGE_BITS masked off.
+    //  * We subtract addr_page (which is page aligned and thus won't
+    //  * disturb the low bits) to give an offset which can be added to the
+    //  * (non-page-aligned) vaddr of the eventual memory access to get
+    //  * the MemoryRegion offset for the access. Note that the vaddr we
+    //  * subtract here is that of the page base, and not the same as the
+    //  * vaddr we add back in io_prepare()/get_page_addr_code().
+    //  */
+    //desc->fulltlb[index] = *full;
+    //full = &desc->fulltlb[index];
+    
     full->xlat_section = iotlb - addr_page;
     full->phys_addr = paddr_page;
+
 
     /* Now calculate the new entry */
     tn.addend = addend - addr_page;
@@ -1479,9 +1483,10 @@ void tlb_set_page_full_cc(CPUState *cpu, int mmu_idx,
     tlb_set_compare(full, &tn, addr_page, write_flags,
                     MMU_DATA_STORE, prot & PAGE_WRITE);
 
-    copy_tlb_helper_locked(te, &tn);
-    tlb_n_used_entries_inc(cpu, mmu_idx);
+    //copy_tlb_helper_locked(te, &tn);
+    //tlb_n_used_entries_inc(cpu, mmu_idx);
     qemu_spin_unlock(&tlb->c.lock);
+    *entry=tn;
 }
 
 void tlb_set_page_with_attrs(CPUState *cpu, vaddr addr,
@@ -1530,7 +1535,7 @@ static void tlb_fill(CPUState *cpu, vaddr addr, int size,
  * Note: tlb_skip_cc().
  */
 static void tlb_skip_cc(CPUState *cpu, vaddr addr, int size,
-                     MMUAccessType access_type, int mmu_idx, uintptr_t retaddr, uint64_t* haddr)
+                     MMUAccessType access_type, int mmu_idx, uintptr_t retaddr, CPUTLB* tlb_skipped, CPUTLBEntryFull* full, CPUTLBEntry* entry)
 {
     bool ok;
 
@@ -1539,7 +1544,7 @@ static void tlb_skip_cc(CPUState *cpu, vaddr addr, int size,
      * should result in exception + longjmp to the cpu loop.
      */
     ok = cpu->cc->tcg_ops->tlb_skip_cc(cpu, addr, size,
-                                    access_type, mmu_idx, false, retaddr, haddr);
+                                    access_type, mmu_idx, false, retaddr, tlb_skipped, full, entry);
     assert(ok);
 }
 
@@ -1778,20 +1783,20 @@ static int probe_access_internal_cc(CPUState *cpu, vaddr addr,
                                  int fault_size, MMUAccessType access_type,
                                  int mmu_idx, bool nonfault,
                                  void **phost, CPUTLBEntryFull **pfull,
-                                 uintptr_t retaddr, bool check_mem_cbs)
+                                 uintptr_t retaddr, bool check_mem_cbs, CPUTLB* tlb_skipped)
 {
-    uintptr_t index = tlb_index_cc(cpu, mmu_idx, addr);
-    CPUTLBEntry *entry = tlb_entry_cc(cpu, mmu_idx, addr);
+    uintptr_t index = tlb_index_cc(cpu, mmu_idx, addr, tlb_skipped);
+    CPUTLBEntry *entry = tlb_entry_cc(cpu, mmu_idx, addr, tlb_skipped);
     uint64_t tlb_addr = tlb_read_idx_cc(entry, access_type);
     vaddr page_addr = addr & TARGET_PAGE_MASK;
     int flags = TLB_FLAGS_MASK & ~TLB_FORCE_SLOW;
     bool force_mmio = check_mem_cbs && cpu_plugin_mem_cbs_enabled(cpu);
-    CPUTLBEntryFull *full;
+    CPUTLBEntryFull *full=NULL;
     //TARGET_CRYPTO_CAP: TLB Miss
     if (!tlb_hit_page_cc(tlb_addr, page_addr)) {
         if (!victim_tlb_hit_cc(cpu, mmu_idx, index, access_type, page_addr)) {
-            if (!cpu->cc->tcg_ops->tlb_fill(cpu, addr, fault_size, access_type,
-                                            mmu_idx, nonfault, retaddr)) {
+            if (!cpu->cc->tcg_ops->tlb_skip_cc(cpu, addr, fault_size, access_type,
+                                            mmu_idx, nonfault, retaddr, tlb_skipped, full, entry)) {
                 /* Non-faulting page table read failed.  */
                 *phost = NULL;
                 *pfull = NULL;
@@ -1799,8 +1804,8 @@ static int probe_access_internal_cc(CPUState *cpu, vaddr addr,
             }
 
             /* TLB resize via tlb_fill may have moved the entry.  */
-            index = tlb_index_cc(cpu, mmu_idx, addr);
-            entry = tlb_entry_cc(cpu, mmu_idx, addr);
+            index = tlb_index_cc(cpu, mmu_idx, addr, tlb_skipped);
+            entry = tlb_entry_cc(cpu, mmu_idx, addr, tlb_skipped);
 
             /*
              * With PAGE_WRITE_INV, we set TLB_INVALID_MASK immediately,
@@ -1830,7 +1835,7 @@ static int probe_access_internal_cc(CPUState *cpu, vaddr addr,
 
 int probe_access_full_mmu_cc(CPUArchState *env, vaddr addr, int size,
                           MMUAccessType access_type, int mmu_idx,
-                          void **phost, CPUTLBEntryFull **pfull)
+                          void **phost, CPUTLBEntryFull **pfull, CPUTLB* tlb_skipped)
 {
     void *discard_phost;
     CPUTLBEntryFull *discard_tlb;
@@ -1840,7 +1845,7 @@ int probe_access_full_mmu_cc(CPUArchState *env, vaddr addr, int size,
     pfull = pfull ? pfull : &discard_tlb;
 
     int flags = probe_access_internal_cc(env_cpu(env), addr, size, access_type,
-                                      mmu_idx, false, phost, pfull, 0, false);
+                                      mmu_idx, false, phost, pfull, 0, false, tlb_skipped);
 
     /* Handle clean RAM pages.  */
     if (unlikely(flags & TLB_NOTDIRTY)) {
@@ -2148,32 +2153,25 @@ static bool mmu_lookup1(CPUState *cpu, MMULookupPageData *data,
  * @mmu_idx may have resized.
  */
 static bool mmu_lookup1_cc(CPUState *cpu, MMULookupPageData *data,
-                        int mmu_idx, MMUAccessType access_type, uintptr_t ra, uint64_t* haddr)
+                        int mmu_idx, MMUAccessType access_type, uintptr_t ra, CPUTLB* tlb_skipped)
 {
     vaddr addr = data->addr;
-    uintptr_t index = tlb_index(cpu, mmu_idx, addr);
-    CPUTLBEntry *entry = tlb_entry(cpu, mmu_idx, addr);
-    uint64_t tlb_addr = tlb_read_idx(entry, access_type);
+    uintptr_t index;
+    CPUTLBEntry entryInst;
+    CPUTLBEntry *entry;
+    uint64_t tlb_addr;
     bool maybe_resized = false;
+    CPUTLBEntryFull fullInstance;
     CPUTLBEntryFull *full;
+    entry=&entryInst;
+    full=&fullInstance;
     int flags;
 
-    /* If the TLB entry is for a different page, reload and try again.  */
-    //#ifdef TARGET_CRYPTO_CAP
-    //if (true){
-    //    if (true){
-    if (!tlb_hit_cc(tlb_addr, addr)) {
-        if (!victim_tlb_hit_cc(cpu, mmu_idx, index, access_type, addr & TARGET_PAGE_MASK)) {
-    //#endif
-            tlb_skip_cc(cpu, addr, data->size, access_type, mmu_idx, ra, haddr);
-            maybe_resized = true;
-            index = tlb_index_cc(cpu, mmu_idx, addr);
-            entry = tlb_entry_cc(cpu, mmu_idx, addr);
-        }
-        tlb_addr = tlb_read_idx_cc(entry, access_type) & ~TLB_INVALID_MASK;
-    }
 
-    full = &cpu->neg.tlb.d[mmu_idx].fulltlb[index];
+    tlb_skip_cc(cpu, addr, data->size, access_type, mmu_idx, ra, tlb_skipped, full, entry);
+    maybe_resized = false;
+    tlb_addr = tlb_read_idx_cc(entry, access_type) & ~TLB_INVALID_MASK;
+    
     flags = tlb_addr & (TLB_FLAGS_MASK & ~TLB_FORCE_SLOW);
     flags |= full->slow_flags[access_type];
 
@@ -2370,7 +2368,7 @@ static bool mmu_lookup(CPUState *cpu, vaddr addr, MemOpIdx oi,
  * bytes.  Return true if the lookup crosses a page boundary.
  */
 static bool mmu_lookup_cc(CPUState *cpu, vaddr addr, MemOpIdx oi,
-                       uintptr_t ra, MMUAccessType type, MMULookupLocals *l, uint64_t* haddr)
+                       uintptr_t ra, MMUAccessType type, MMULookupLocals *l, CPUTLB* tlb_skipped)
 {
     unsigned a_bits;
     bool crosspage;
@@ -2395,7 +2393,7 @@ static bool mmu_lookup_cc(CPUState *cpu, vaddr addr, MemOpIdx oi,
     crosspage = (addr ^ l->page[1].addr) & TARGET_PAGE_MASK;
 
     if (likely(!crosspage)) {
-        mmu_lookup1_cc(cpu, &l->page[0], l->mmu_idx, type, ra, haddr);
+        mmu_lookup1_cc(cpu, &l->page[0], l->mmu_idx, type, ra, tlb_skipped);
 
         flags = l->page[0].flags;
         if (unlikely(flags & (TLB_WATCHPOINT | TLB_NOTDIRTY))) {
@@ -2414,9 +2412,11 @@ static bool mmu_lookup_cc(CPUState *cpu, vaddr addr, MemOpIdx oi,
          * Lookup both pages, recognizing exceptions from either.  If the
          * second lookup potentially resized, refresh first CPUTLBEntryFull.
          */
-        mmu_lookup1_cc(cpu, &l->page[0], l->mmu_idx, type, ra, haddr);
-        if (mmu_lookup1_cc(cpu, &l->page[1], l->mmu_idx, type, ra, haddr)) {
-            uintptr_t index = tlb_index_cc(cpu, l->mmu_idx, addr);
+        mmu_lookup1_cc(cpu, &l->page[0], l->mmu_idx, type, ra, tlb_skipped);
+        if (mmu_lookup1_cc(cpu, &l->page[1], l->mmu_idx, type, ra, tlb_skipped)) {
+            uintptr_t index = tlb_index_cc(cpu, l->mmu_idx, addr, tlb_skipped);
+
+
             l->page[0].full = &cpu->neg.tlb.d[l->mmu_idx].fulltlb[index];
         }
 
@@ -3000,10 +3000,9 @@ static uint8_t do_ld1_mmu_cc(CPUState *cpu, vaddr addr, MemOpIdx oi,
     MMULookupLocals l;
     bool crosspage;
 
-    uint64_t haddr;
+    CPUTLB tlb;
     cpu_req_mo(TCG_MO_LD_LD | TCG_MO_ST_LD);
-    crosspage = mmu_lookup_cc(cpu, addr, oi, ra, access_type, &l, &haddr);
-    //l.page[0].haddr = (void*)haddr;
+    crosspage = mmu_lookup_cc(cpu, addr, oi, ra, access_type, &l, &tlb);
     tcg_debug_assert(!crosspage);
     
     return do_ld_1(cpu, &l.page[0], l.mmu_idx, access_type, ra);

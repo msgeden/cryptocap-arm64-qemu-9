@@ -403,9 +403,9 @@ static inline uintptr_t tlb_index(CPUState *cpu, uintptr_t mmu_idx,
 
 /* Find the TLB index corresponding to the mmu_idx + address pair.  */
 static inline uintptr_t tlb_index_cc(CPUState *cpu, uintptr_t mmu_idx,
-                                  vaddr addr)
+                                  vaddr addr, CPUTLB* tlb_skipped)
 {
-    uintptr_t size_mask = cpu->neg.tlb.f[mmu_idx].mask >> CPU_TLB_ENTRY_BITS;
+    uintptr_t size_mask = tlb_skipped->f[mmu_idx].mask >> CPU_TLB_ENTRY_BITS;
 
     return (addr >> TARGET_PAGE_BITS) & size_mask;
 }
@@ -419,9 +419,9 @@ static inline CPUTLBEntry *tlb_entry(CPUState *cpu, uintptr_t mmu_idx,
 
 /* Find the TLB entry corresponding to the mmu_idx + address pair.  */
 static inline CPUTLBEntry *tlb_entry_cc(CPUState *cpu, uintptr_t mmu_idx,
-                                     vaddr addr)
+                                     vaddr addr, CPUTLB* tlb_skipped)
 {
-    return &cpu->neg.tlb.f[mmu_idx].table[tlb_index_cc(cpu, mmu_idx, addr)];
+    return &tlb_skipped->f[mmu_idx].table[tlb_index_cc(cpu, mmu_idx, addr, tlb_skipped)];
 }
 
 #endif /* defined(CONFIG_USER_ONLY) */
