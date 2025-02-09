@@ -51,11 +51,26 @@ static inline bool cpu_loop_exit_requested(CPUState *cpu)
  * @cpu: CPU whose TLB should be initialized
  */
 void tlb_init(CPUState *cpu);
+
+/**
+ * tlb_init_crca - initialize a CPU's TLB
+ * @cpu: CPU whose TLB should be initialized
+ */
+void tlb_init_crca(CPUState *cpu);
+
 /**
  * tlb_destroy - destroy a CPU's TLB
  * @cpu: CPU whose TLB should be destroyed
  */
 void tlb_destroy(CPUState *cpu);
+
+
+/**
+ * tlb_destroy_crca - destroy a CPU's TLB
+ * @cpu: CPU whose TLB should be destroyed
+ */
+void tlb_destroy_crca(CPUState *cpu);
+
 /**
  * tlb_flush_page:
  * @cpu: CPU whose TLB should be flushed
@@ -65,6 +80,19 @@ void tlb_destroy(CPUState *cpu);
  * MMU indexes.
  */
 void tlb_flush_page(CPUState *cpu, vaddr addr);
+
+
+/**
+ * tlb_flush_page_crca:
+ * @cpu: CPU whose TLB should be flushed
+ * @addr: virtual address of page to be flushed
+ *
+ * Flush one page from the TLB of the specified CPU, for all
+ * MMU indexes.
+ */
+void tlb_flush_page_crca(CPUState *cpu, vaddr addr);
+
+
 /**
  * tlb_flush_page_all_cpus:
  * @cpu: src CPU of the flush
@@ -74,6 +102,18 @@ void tlb_flush_page(CPUState *cpu, vaddr addr);
  * MMU indexes.
  */
 void tlb_flush_page_all_cpus(CPUState *src, vaddr addr);
+
+
+/**
+ * tlb_flush_page_all_cpus_crca:
+ * @cpu: src CPU of the flush
+ * @addr: virtual address of page to be flushed
+ *
+ * Flush one page from the TLB of the specified CPU, for all
+ * MMU indexes.
+ */
+void tlb_flush_page_all_cpus_crca(CPUState *src, vaddr addr);
+
 /**
  * tlb_flush_page_all_cpus_synced:
  * @cpu: src CPU of the flush
@@ -86,6 +126,20 @@ void tlb_flush_page_all_cpus(CPUState *src, vaddr addr);
  * the guests translation ends the TB.
  */
 void tlb_flush_page_all_cpus_synced(CPUState *src, vaddr addr);
+
+/**
+ * tlb_flush_page_all_cpus_synced_crca:
+ * @cpu: src CPU of the flush
+ * @addr: virtual address of page to be flushed
+ *
+ * Flush one page from the TLB of the specified CPU, for all MMU
+ * indexes like tlb_flush_page_all_cpus except the source vCPUs work
+ * is scheduled as safe work meaning all flushes will be complete once
+ * the source vCPUs safe work is complete. This will depend on when
+ * the guests translation ends the TB.
+ */
+void tlb_flush_page_all_cpus_synced_crca(CPUState *src, vaddr addr);
+
 /**
  * tlb_flush:
  * @cpu: CPU whose TLB should be flushed
@@ -96,11 +150,30 @@ void tlb_flush_page_all_cpus_synced(CPUState *src, vaddr addr);
  * use one of the other functions for efficiency.
  */
 void tlb_flush(CPUState *cpu);
+
+/**
+ * tlb_flush_crca:
+ * @cpu: CPU whose TLB should be flushed
+ *
+ * Flush the entire TLB for the specified CPU. Most CPU architectures
+ * allow the implementation to drop entries from the TLB at any time
+ * so this is generally safe. If more selective flushing is required
+ * use one of the other functions for efficiency.
+ */
+void tlb_flush_crca(CPUState *cpu);
+
 /**
  * tlb_flush_all_cpus:
  * @cpu: src CPU of the flush
  */
 void tlb_flush_all_cpus(CPUState *src_cpu);
+
+/**
+ * tlb_flush_all_cpus_crca:
+ * @cpu: src CPU of the flush
+ */
+void tlb_flush_all_cpus_crca(CPUState *src_cpu);
+
 /**
  * tlb_flush_all_cpus_synced:
  * @cpu: src CPU of the flush
@@ -112,6 +185,16 @@ void tlb_flush_all_cpus(CPUState *src_cpu);
  */
 void tlb_flush_all_cpus_synced(CPUState *src_cpu);
 /**
+ * tlb_flush_all_cpus_synced_crca:
+ * @cpu: src CPU of the flush
+ *
+ * Like tlb_flush_all_cpus except this except the source vCPUs work is
+ * scheduled as safe work meaning all flushes will be complete once
+ * the source vCPUs safe work is complete. This will depend on when
+ * the guests translation ends the TB.
+ */
+void tlb_flush_all_cpus_synced_crca(CPUState *src_cpu);
+/**
  * tlb_flush_page_by_mmuidx:
  * @cpu: CPU whose TLB should be flushed
  * @addr: virtual address of page to be flushed
@@ -121,6 +204,18 @@ void tlb_flush_all_cpus_synced(CPUState *src_cpu);
  * MMU indexes.
  */
 void tlb_flush_page_by_mmuidx(CPUState *cpu, vaddr addr,
+                              uint16_t idxmap);
+
+/**
+ * tlb_flush_page_by_mmuidx_crca:
+ * @cpu: CPU whose TLB should be flushed
+ * @addr: virtual address of page to be flushed
+ * @idxmap: bitmap of MMU indexes to flush
+ *
+ * Flush one page from the TLB of the specified CPU, for the specified
+ * MMU indexes.
+ */
+void tlb_flush_page_by_mmuidx_crca(CPUState *cpu, vaddr addr,
                               uint16_t idxmap);
 /**
  * tlb_flush_page_by_mmuidx_all_cpus:
@@ -132,6 +227,18 @@ void tlb_flush_page_by_mmuidx(CPUState *cpu, vaddr addr,
  * MMU indexes.
  */
 void tlb_flush_page_by_mmuidx_all_cpus(CPUState *cpu, vaddr addr,
+                                       uint16_t idxmap);
+
+                                       /**
+ * tlb_flush_page_by_mmuidx_all_cpus_crca:
+ * @cpu: Originating CPU of the flush
+ * @addr: virtual address of page to be flushed
+ * @idxmap: bitmap of MMU indexes to flush
+ *
+ * Flush one page from the TLB of all CPUs, for the specified
+ * MMU indexes.
+ */
+void tlb_flush_page_by_mmuidx_all_cpus_crca(CPUState *cpu, vaddr addr,
                                        uint16_t idxmap);
 /**
  * tlb_flush_page_by_mmuidx_all_cpus_synced:
@@ -147,6 +254,22 @@ void tlb_flush_page_by_mmuidx_all_cpus(CPUState *cpu, vaddr addr,
  */
 void tlb_flush_page_by_mmuidx_all_cpus_synced(CPUState *cpu, vaddr addr,
                                               uint16_t idxmap);
+
+
+/**
+ * tlb_flush_page_by_mmuidx_all_cpus_synced_crca:
+ * @cpu: Originating CPU of the flush
+ * @addr: virtual address of page to be flushed
+ * @idxmap: bitmap of MMU indexes to flush
+ *
+ * Flush one page from the TLB of all CPUs, for the specified MMU
+ * indexes like tlb_flush_page_by_mmuidx_all_cpus except the source
+ * vCPUs work is scheduled as safe work meaning all flushes will be
+ * complete once  the source vCPUs safe work is complete. This will
+ * depend on when the guests translation ends the TB.
+ */
+void tlb_flush_page_by_mmuidx_all_cpus_synced_crca(CPUState *cpu, vaddr addr,
+                                              uint16_t idxmap);
 /**
  * tlb_flush_by_mmuidx:
  * @cpu: CPU whose TLB should be flushed
@@ -158,6 +281,15 @@ void tlb_flush_page_by_mmuidx_all_cpus_synced(CPUState *cpu, vaddr addr,
  */
 void tlb_flush_by_mmuidx(CPUState *cpu, uint16_t idxmap);
 /**
+ * tlb_flush_by_mmuidx_crca:
+ * @cpu: Originating CPU of the flush
+ * @idxmap: bitmap of MMU indexes to flush
+ *
+ * Flush all entries from all TLBs of all CPUs, for the specified
+ * MMU indexes.
+ */
+void tlb_flush_by_mmuidx_crca(CPUState *cpu, uint16_t idxmap);
+/**
  * tlb_flush_by_mmuidx_all_cpus:
  * @cpu: Originating CPU of the flush
  * @idxmap: bitmap of MMU indexes to flush
@@ -166,6 +298,16 @@ void tlb_flush_by_mmuidx(CPUState *cpu, uint16_t idxmap);
  * MMU indexes.
  */
 void tlb_flush_by_mmuidx_all_cpus(CPUState *cpu, uint16_t idxmap);
+/**
+ * tlb_flush_by_mmuidx_all_cpus_crca:
+ * @cpu: Originating CPU of the flush
+ * @idxmap: bitmap of MMU indexes to flush
+ *
+ * Flush all entries from all TLBs of all CPUs, for the specified
+ * MMU indexes.
+ */
+void tlb_flush_by_mmuidx_all_cpus_crca(CPUState *cpu, uint16_t idxmap);
+
 /**
  * tlb_flush_by_mmuidx_all_cpus_synced:
  * @cpu: Originating CPU of the flush
@@ -178,6 +320,18 @@ void tlb_flush_by_mmuidx_all_cpus(CPUState *cpu, uint16_t idxmap);
  * depend on when the guests translation ends the TB.
  */
 void tlb_flush_by_mmuidx_all_cpus_synced(CPUState *cpu, uint16_t idxmap);
+/**
+ * tlb_flush_by_mmuidx_all_cpus_synced_crca:
+ * @cpu: Originating CPU of the flush
+ * @idxmap: bitmap of MMU indexes to flush
+ *
+ * Flush all entries from all TLBs of all CPUs, for the specified
+ * MMU indexes like tlb_flush_by_mmuidx_all_cpus except except the source
+ * vCPUs work is scheduled as safe work meaning all flushes will be
+ * complete once  the source vCPUs safe work is complete. This will
+ * depend on when the guests translation ends the TB.
+ */
+void tlb_flush_by_mmuidx_all_cpus_synced_crca(CPUState *cpu, uint16_t idxmap);
 
 /**
  * tlb_flush_page_bits_by_mmuidx
@@ -190,11 +344,27 @@ void tlb_flush_by_mmuidx_all_cpus_synced(CPUState *cpu, uint16_t idxmap);
  */
 void tlb_flush_page_bits_by_mmuidx(CPUState *cpu, vaddr addr,
                                    uint16_t idxmap, unsigned bits);
-
+                                   /**
+ * tlb_flush_page_bits_by_mmuidx
+ * @cpu: CPU whose TLB should be flushed
+ * @addr: virtual address of page to be flushed
+ * @idxmap: bitmap of mmu indexes to flush
+ * @bits: number of significant bits in address
+ *
+ * Similar to tlb_flush_page_mask, but with a bitmap of indexes.
+ */
+void tlb_flush_page_bits_by_mmuidx_crca(CPUState *cpu, vaddr addr,
+                                   uint16_t idxmap, unsigned bits);
 /* Similarly, with broadcast and syncing. */
 void tlb_flush_page_bits_by_mmuidx_all_cpus(CPUState *cpu, vaddr addr,
                                             uint16_t idxmap, unsigned bits);
+void tlb_flush_page_bits_by_mmuidx_all_cpus_crca(CPUState *cpu, vaddr addr,
+                                            uint16_t idxmap, unsigned bits);
+
 void tlb_flush_page_bits_by_mmuidx_all_cpus_synced
+    (CPUState *cpu, vaddr addr, uint16_t idxmap, unsigned bits);
+
+void tlb_flush_page_bits_by_mmuidx_all_cpus_synced_crca
     (CPUState *cpu, vaddr addr, uint16_t idxmap, unsigned bits);
 
 /**
@@ -212,16 +382,42 @@ void tlb_flush_range_by_mmuidx(CPUState *cpu, vaddr addr,
                                vaddr len, uint16_t idxmap,
                                unsigned bits);
 
+/**
+ * tlb_flush_range_by_mmuidx_crca
+ * @cpu: CPU whose TLB should be flushed
+ * @addr: virtual address of the start of the range to be flushed
+ * @len: length of range to be flushed
+ * @idxmap: bitmap of mmu indexes to flush
+ * @bits: number of significant bits in address
+ *
+ * For each mmuidx in @idxmap, flush all pages within [@addr,@addr+@len),
+ * comparing only the low @bits worth of each virtual page.
+ */
+void tlb_flush_range_by_mmuidx_crca(CPUState *cpu, vaddr addr,
+                               vaddr len, uint16_t idxmap,
+                               unsigned bits);
+
 /* Similarly, with broadcast and syncing. */
 void tlb_flush_range_by_mmuidx_all_cpus(CPUState *cpu, vaddr addr,
                                         vaddr len, uint16_t idxmap,
                                         unsigned bits);
+
+                                        /* Similarly, with broadcast and syncing. */
+void tlb_flush_range_by_mmuidx_all_cpus_crca(CPUState *cpu, vaddr addr,
+                                        vaddr len, uint16_t idxmap,
+                                        unsigned bits);
+                                        
 void tlb_flush_range_by_mmuidx_all_cpus_synced(CPUState *cpu,
                                                vaddr addr,
                                                vaddr len,
                                                uint16_t idxmap,
                                                unsigned bits);
 
+void tlb_flush_range_by_mmuidx_all_cpus_synced_crca(CPUState *cpu,
+                                               vaddr addr,
+                                               vaddr len,
+                                               uint16_t idxmap,
+                                               unsigned bits);
 /**
  * tlb_set_page_full:
  * @cpu: CPU context
@@ -242,6 +438,29 @@ void tlb_flush_range_by_mmuidx_all_cpus_synced(CPUState *cpu,
  * used by tlb_flush_page.
  */
 void tlb_set_page_full(CPUState *cpu, int mmu_idx, vaddr addr,
+                       CPUTLBEntryFull *full);
+
+
+/**
+ * tlb_set_page_full_crca:
+ * @cpu: CPU context
+ * @mmu_idx: mmu index of the tlb to modify
+ * @addr: virtual address of the entry to add
+ * @full: the details of the tlb entry
+ *
+ * Add an entry to @cpu tlb index @mmu_idx.  All of the fields of
+ * @full must be filled, except for xlat_section, and constitute
+ * the complete description of the translated page.
+ *
+ * This is generally called by the target tlb_fill function after
+ * having performed a successful page table walk to find the physical
+ * address and attributes for the translation.
+ *
+ * At most one entry for a given virtual address is permitted. Only a
+ * single TARGET_PAGE_SIZE region is mapped; @full->lg_page_size is only
+ * used by tlb_flush_page.
+ */
+void tlb_set_page_full_crca(CPUState *cpu, int mmu_idx, vaddr addr,
                        CPUTLBEntryFull *full);
 
 
@@ -291,6 +510,32 @@ void tlb_set_page_full_cc(CPUState *cpu, int mmu_idx, vaddr addr,
 void tlb_set_page_with_attrs(CPUState *cpu, vaddr addr,
                              hwaddr paddr, MemTxAttrs attrs,
                              int prot, int mmu_idx, vaddr size);
+
+/**
+ * tlb_set_page_with_attrs:
+ * @cpu: CPU to add this TLB entry for
+ * @addr: virtual address of page to add entry for
+ * @paddr: physical address of the page
+ * @attrs: memory transaction attributes
+ * @prot: access permissions (PAGE_READ/PAGE_WRITE/PAGE_EXEC bits)
+ * @mmu_idx: MMU index to insert TLB entry for
+ * @size: size of the page in bytes
+ *
+ * Add an entry to this CPU's TLB (a mapping from virtual address
+ * @addr to physical address @paddr) with the specified memory
+ * transaction attributes. This is generally called by the target CPU
+ * specific code after it has been called through the tlb_fill()
+ * entry point and performed a successful page table walk to find
+ * the physical address and attributes for the virtual address
+ * which provoked the TLB miss.
+ *
+ * At most one entry for a given virtual address is permitted. Only a
+ * single TARGET_PAGE_SIZE region is mapped; the supplied @size is only
+ * used by tlb_flush_page.
+ */
+void tlb_set_page_with_attrs_crca(CPUState *cpu, vaddr addr,
+                             hwaddr paddr, MemTxAttrs attrs,
+                             int prot, int mmu_idx, vaddr size);
 /* tlb_set_page:
  *
  * This function is equivalent to calling tlb_set_page_with_attrs()
@@ -300,40 +545,84 @@ void tlb_set_page_with_attrs(CPUState *cpu, vaddr addr,
 void tlb_set_page(CPUState *cpu, vaddr addr,
                   hwaddr paddr, int prot,
                   int mmu_idx, vaddr size);
+/* tlb_set_page_crca:
+ *
+ * This function is equivalent to calling tlb_set_page_with_attrs()
+ * with an @attrs argument of MEMTXATTRS_UNSPECIFIED. It's provided
+ * as a convenience for CPUs which don't use memory transaction attributes.
+ */
+void tlb_set_page_crca(CPUState *cpu, vaddr addr,
+                  hwaddr paddr, int prot,
+                  int mmu_idx, vaddr size);
 #else
 static inline void tlb_init(CPUState *cpu)
+{
+}
+static inline void tlb_init_crca(CPUState *cpu)
 {
 }
 static inline void tlb_destroy(CPUState *cpu)
 {
 }
+static inline void tlb_destroy_crca(CPUState *cpu)
+{
+}
 static inline void tlb_flush_page(CPUState *cpu, vaddr addr)
+{
+}
+static inline void tlb_flush_page_crca(CPUState *cpu, vaddr addr)
 {
 }
 static inline void tlb_flush_page_all_cpus(CPUState *src, vaddr addr)
 {
 }
+static inline void tlb_flush_page_all_cpus_crca(CPUState *src, vaddr addr)
+{
+}
 static inline void tlb_flush_page_all_cpus_synced(CPUState *src, vaddr addr)
+{
+}
+static inline void tlb_flush_page_all_cpus_synced_crca(CPUState *src, vaddr addr)
 {
 }
 static inline void tlb_flush(CPUState *cpu)
 {
 }
+static inline void tlb_flush_crca(CPUState *cpu)
+{
+}
 static inline void tlb_flush_all_cpus(CPUState *src_cpu)
 {
 }
+static inline void tlb_flush_all_cpus_crca(CPUState *src_cpu)
+{
+}
 static inline void tlb_flush_all_cpus_synced(CPUState *src_cpu)
+{
+}
+static inline void tlb_flush_all_cpus_synced_crca(CPUState *src_cpu)
 {
 }
 static inline void tlb_flush_page_by_mmuidx(CPUState *cpu,
                                             vaddr addr, uint16_t idxmap)
 {
 }
-
+static inline void tlb_flush_page_by_mmuidx_crca(CPUState *cpu,
+                                            vaddr addr, uint16_t idxmap)
+{
+}
 static inline void tlb_flush_by_mmuidx(CPUState *cpu, uint16_t idxmap)
 {
 }
+static inline void tlb_flush_by_mmuidx_crca(CPUState *cpu, uint16_t idxmap)
+{
+}
 static inline void tlb_flush_page_by_mmuidx_all_cpus(CPUState *cpu,
+                                                     vaddr addr,
+                                                     uint16_t idxmap)
+{
+}
+static inline void tlb_flush_page_by_mmuidx_all_cpus_crca(CPUState *cpu,
                                                      vaddr addr,
                                                      uint16_t idxmap)
 {
@@ -343,15 +632,33 @@ static inline void tlb_flush_page_by_mmuidx_all_cpus_synced(CPUState *cpu,
                                                             uint16_t idxmap)
 {
 }
+static inline void tlb_flush_page_by_mmuidx_all_cpus_synced_crca(CPUState *cpu,
+                                                            vaddr addr,
+                                                            uint16_t idxmap)
+{
+}
 static inline void tlb_flush_by_mmuidx_all_cpus(CPUState *cpu, uint16_t idxmap)
 {
 }
 
+static inline void tlb_flush_by_mmuidx_all_cpus_crca(CPUState *cpu, uint16_t idxmap)
+{
+}
 static inline void tlb_flush_by_mmuidx_all_cpus_synced(CPUState *cpu,
                                                        uint16_t idxmap)
 {
 }
+static inline void tlb_flush_by_mmuidx_all_cpus_synced_crca(CPUState *cpu,
+                                                       uint16_t idxmap)
+{
+}
 static inline void tlb_flush_page_bits_by_mmuidx(CPUState *cpu,
+                                                 vaddr addr,
+                                                 uint16_t idxmap,
+                                                 unsigned bits)
+{
+}
+static inline void tlb_flush_page_bits_by_mmuidx_crca(CPUState *cpu,
                                                  vaddr addr,
                                                  uint16_t idxmap,
                                                  unsigned bits)
@@ -363,12 +670,31 @@ static inline void tlb_flush_page_bits_by_mmuidx_all_cpus(CPUState *cpu,
                                                           unsigned bits)
 {
 }
+
+static inline void tlb_flush_page_bits_by_mmuidx_all_cpus_crca(CPUState *cpu,
+                                                          vaddr addr,
+                                                          uint16_t idxmap,
+                                                          unsigned bits)
+{
+}
 static inline void
 tlb_flush_page_bits_by_mmuidx_all_cpus_synced(CPUState *cpu, vaddr addr,
                                               uint16_t idxmap, unsigned bits)
 {
 }
+
+static inline void
+tlb_flush_page_bits_by_mmuidx_all_cpus_synced_crca(CPUState *cpu, vaddr addr,
+                                              uint16_t idxmap, unsigned bits)
+{
+}
 static inline void tlb_flush_range_by_mmuidx(CPUState *cpu, vaddr addr,
+                                             vaddr len, uint16_t idxmap,
+                                             unsigned bits)
+{
+}
+
+static inline void tlb_flush_range_by_mmuidx_crca(CPUState *cpu, vaddr addr,
                                              vaddr len, uint16_t idxmap,
                                              unsigned bits)
 {
@@ -380,7 +706,23 @@ static inline void tlb_flush_range_by_mmuidx_all_cpus(CPUState *cpu,
                                                       unsigned bits)
 {
 }
+
+static inline void tlb_flush_range_by_mmuidx_all_cpus_crca(CPUState *cpu,
+                                                      vaddr addr,
+                                                      vaddr len,
+                                                      uint16_t idxmap,
+                                                      unsigned bits)
+{
+}
 static inline void tlb_flush_range_by_mmuidx_all_cpus_synced(CPUState *cpu,
+                                                             vaddr addr,
+                                                             vaddr len,
+                                                             uint16_t idxmap,
+                                                             unsigned bits)
+{
+}
+
+static inline void tlb_flush_range_by_mmuidx_all_cpus_synced_crca(CPUState *cpu,
                                                              vaddr addr,
                                                              vaddr len,
                                                              uint16_t idxmap,
@@ -443,6 +785,31 @@ int probe_access_flags(CPUArchState *env, vaddr addr, int size,
                        MMUAccessType access_type, int mmu_idx,
                        bool nonfault, void **phost, uintptr_t retaddr);
 
+
+/**
+ * probe_access_flags_crca:
+ * @env: CPUArchState
+ * @addr: guest virtual address to look up
+ * @size: size of the access
+ * @access_type: read, write or execute permission
+ * @mmu_idx: MMU index to use for lookup
+ * @nonfault: suppress the fault
+ * @phost: return value for host address
+ * @retaddr: return address for unwinding
+ *
+ * Similar to probe_access, loosely returning the TLB_FLAGS_MASK for
+ * the page, and storing the host address for RAM in @phost.
+ *
+ * If @nonfault is set, do not raise an exception but return TLB_INVALID_MASK.
+ * Do not handle watchpoints, but include TLB_WATCHPOINT in the returned flags.
+ * Do handle clean pages, so exclude TLB_NOTDIRY from the returned flags.
+ * For simplicity, all "mmio-like" flags are folded to TLB_MMIO.
+ */
+int probe_access_flags_crca(CPUArchState *env, vaddr addr, int size,
+    MMUAccessType access_type, int mmu_idx,
+    bool nonfault, void **phost, uintptr_t retaddr);
+ 
+
 #ifndef CONFIG_USER_ONLY
 /**
  * probe_access_full:
@@ -457,6 +824,18 @@ int probe_access_full(CPUArchState *env, vaddr addr, int size,
                       bool nonfault, void **phost,
                       CPUTLBEntryFull **pfull, uintptr_t retaddr);
 
+                      /**
+ * probe_access_full_crca:
+ * Like probe_access_flags, except also return into @pfull.
+ *
+ * The CPUTLBEntryFull structure returned via @pfull is transient
+ * and must be consumed or copied immediately, before any further
+ * access or changes to TLB @mmu_idx.
+ */
+int probe_access_full_crca(CPUArchState *env, vaddr addr, int size,
+    MMUAccessType access_type, int mmu_idx,
+    bool nonfault, void **phost,
+    CPUTLBEntryFull **pfull, uintptr_t retaddr);
 /**
  * probe_access_mmu() - Like probe_access_full except cannot fault and
  * doesn't trigger instrumentation.
@@ -478,6 +857,33 @@ int probe_access_full(CPUArchState *env, vaddr addr, int size,
 int probe_access_full_mmu(CPUArchState *env, vaddr addr, int size,
                           MMUAccessType access_type, int mmu_idx,
                           void **phost, CPUTLBEntryFull **pfull);
+
+
+
+/**
+ * probe_access_mmu() - Like probe_access_full except cannot fault and
+ * doesn't trigger instrumentation.
+ *
+ * @env: CPUArchState
+ * @vaddr: virtual address to probe
+ * @size: size of the probe
+ * @access_type: read, write or execute permission
+ * @mmu_idx: softmmu index
+ * @phost: ptr to return value host address or NULL
+ * @pfull: ptr to return value CPUTLBEntryFull structure or NULL
+ *
+ * The CPUTLBEntryFull structure returned via @pfull is transient
+ * and must be consumed or copied immediately, before any further
+ * access or changes to TLB @mmu_idx.
+ *
+ * Returns: TLB flags as per probe_access_flags()
+ */
+int probe_access_full_mmu_crca(CPUArchState *env, vaddr addr, int size,
+                          MMUAccessType access_type, int mmu_idx,
+                          void **phost, CPUTLBEntryFull **pfull);
+
+
+                
 //#ifdef TARGET_CRYTPO_CAP
 int probe_access_full_mmu_cc(CPUArchState *env, vaddr addr, int size,
                           MMUAccessType access_type, int mmu_idx,

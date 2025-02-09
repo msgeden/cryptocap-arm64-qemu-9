@@ -547,6 +547,38 @@ void cpu_stq_le_data(CPUArchState *env, abi_ptr addr, uint64_t val)
 
 //#ifdef TARGET_CRYPTO_CAP
 /*--------------------------*/
+uint8_t cpu_ldb_mmu_crca(CPUArchState *env, abi_ptr addr, MemOpIdx oi, uintptr_t ra)
+{
+    uint8_t ret;
+
+    tcg_debug_assert((get_memop(oi) & MO_SIZE) == MO_UB);
+    //ret = do_ld1_mmu_cc(env_cpu(env), addr, oi, ra, MMU_CC_DATA_LOAD);
+    ret = do_ld1_mmu_crca(env_cpu(env), addr, oi, ra, MMU_DATA_LOAD);
+
+    plugin_load_cb(env, addr, oi);
+    return ret;
+}
+
+uint32_t cpu_ldub_mmuidx_ra_crca(CPUArchState *env, abi_ptr addr,
+                            int mmu_idx, uintptr_t ra)
+{
+    MemOpIdx oi = make_memop_idx(MO_UB, mmu_idx);
+    return cpu_ldb_mmu_crca(env, addr, oi, ra);
+}
+
+uint32_t cpu_ldub_data_ra_crca(CPUArchState *env, abi_ptr addr, uintptr_t ra)
+{
+    int mmu_index = cpu_mmu_index(env_cpu(env), false);
+    return cpu_ldub_mmuidx_ra_crca(env, addr, mmu_index, ra);
+}
+
+uint32_t cpu_ldub_data_crca(CPUArchState *env, abi_ptr addr)
+{
+    return cpu_ldub_data_ra_crca(env, addr, 0);
+}
+
+
+
 uint8_t cpu_ldb_mmu_cc(CPUArchState *env, abi_ptr addr, MemOpIdx oi, uintptr_t ra)
 {
     uint8_t ret;

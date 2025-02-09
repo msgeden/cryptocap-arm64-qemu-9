@@ -51,8 +51,14 @@ int cpu_watchpoint_insert(CPUState *cpu, vaddr addr, vaddr len,
     in_page = -(addr | TARGET_PAGE_MASK);
     if (len <= in_page) {
         tlb_flush_page(cpu, addr);
+    //#ifdef TARGET_CRYPTO_CAP    
+        tlb_flush_page_crca(cpu, addr);
+    //#endif
     } else {
         tlb_flush(cpu);
+    //#ifdef TARGET_CRYPTO_CAP
+        tlb_flush_crca(cpu);
+    //#endif
     }
 
     if (watchpoint) {
@@ -83,7 +89,9 @@ void cpu_watchpoint_remove_by_ref(CPUState *cpu, CPUWatchpoint *watchpoint)
     QTAILQ_REMOVE(&cpu->watchpoints, watchpoint, entry);
 
     tlb_flush_page(cpu, watchpoint->vaddr);
-
+//#ifdef TARGET_CRYPTO_CA
+    tlb_flush_page_crca(cpu, watchpoint->vaddr);
+//#endif
     g_free(watchpoint);
 }
 

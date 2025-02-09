@@ -814,6 +814,49 @@ static int probe_access_internal(CPUArchState *env, vaddr addr,
     cpu_loop_exit_sigsegv(env_cpu(env), addr, access_type, maperr, ra);
 }
 
+
+static int probe_access_internal_crca(CPUArchState *env, vaddr addr,
+                                 int fault_size, MMUAccessType access_type,
+                                 bool nonfault, uintptr_t ra)
+{
+    int acc_flag;
+    bool maperr;
+
+    switch (access_type) {
+    case MMU_DATA_STORE:
+        acc_flag = PAGE_WRITE_ORG;
+        break;
+    case MMU_DATA_LOAD:
+        acc_flag = PAGE_READ;
+        break;
+    case MMU_INST_FETCH:
+        acc_flag = PAGE_EXEC;
+        break;
+    default:
+        g_assert_not_reached();
+    }
+
+    if (guest_addr_valid_untagged(addr)) {
+        int page_flags = page_get_flags(addr);
+        if (page_flags & acc_flag) {
+            if ((acc_flag == PAGE_READ || acc_flag == PAGE_WRITE)
+                && cpu_plugin_mem_cbs_enabled(env_cpu(env))) {
+                return TLB_MMIO;
+            }
+            return 0; /* success */
+        }
+        maperr = !(page_flags & PAGE_VALID);
+    } else {
+        maperr = true;
+    }
+
+    if (nonfault) {
+        return TLB_INVALID_MASK;
+    }
+
+    cpu_loop_exit_sigsegv(env_cpu(env), addr, access_type, maperr, ra);
+}
+
 int probe_access_flags(CPUArchState *env, vaddr addr, int size,
                        MMUAccessType access_type, int mmu_idx,
                        bool nonfault, void **phost, uintptr_t ra)
@@ -826,6 +869,19 @@ int probe_access_flags(CPUArchState *env, vaddr addr, int size,
     return flags;
 }
 
+
+int probe_access_flags_crca(CPUArchState *env, vaddr addr, int size,
+                       MMUAccessType access_type, int mmu_idx,
+                       bool nonfault, void **phost, uintptr_t ra)
+{
+    int flags;
+
+    g_assert(-(addr | TARGET_PAGE_MASK) >= size);
+    flags = probe_access_internal_crca(env, addr, size, access_type, nonfault, ra);
+    *phost = (flags & TLB_INVALID_MASK) ? NULL : g2h(env_cpu(env), addr);
+    return flags;
+}
+
 void *probe_access(CPUArchState *env, vaddr addr, int size,
                    MMUAccessType access_type, int mmu_idx, uintptr_t ra)
 {
@@ -833,6 +889,18 @@ void *probe_access(CPUArchState *env, vaddr addr, int size,
 
     g_assert(-(addr | TARGET_PAGE_MASK) >= size);
     flags = probe_access_internal(env, addr, size, access_type, false, ra);
+    g_assert((flags & ~TLB_MMIO) == 0);
+
+    return size ? g2h(env_cpu(env), addr) : NULL;
+}
+
+void *probe_access_crca(CPUArchState *env, vaddr addr, int size,
+                   MMUAccessType access_type, int mmu_idx, uintptr_t ra)
+{
+    int flags;
+
+    g_assert(-(addr | TARGET_PAGE_MASK) >= size);
+    flags = probe_access_internal_crca(env, addr, size, access_type, false, ra);
     g_assert((flags & ~TLB_MMIO) == 0);
 
     return size ? g2h(env_cpu(env), addr) : NULL;
@@ -852,6 +920,20 @@ tb_page_addr_t get_page_addr_code_hostp(CPUArchState *env, vaddr addr,
     return addr;
 }
 
+
+tb_page_addr_t get_page_addr_code_hostp_crca(CPUArchState *env, vaddr addr,
+                                        void **hostp)
+{
+    int flags;
+
+    flags = probe_access_internal_crca(env, addr, 1, MMU_INST_FETCH, false, 0);
+    g_assert(flags == 0);
+
+    if (hostp) {
+        *hostp = g2h_untagged(addr);
+    }
+    return addr;
+}
 #ifdef TARGET_PAGE_DATA_SIZE
 /*
  * Allocate chunks of target data together.  For the only current user,

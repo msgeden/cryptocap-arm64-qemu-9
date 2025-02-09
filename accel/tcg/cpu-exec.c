@@ -1075,6 +1075,10 @@ bool tcg_exec_realizefn(CPUState *cpu, Error **errp)
 
     cpu->tb_jmp_cache = g_new0(CPUJumpCache, 1);
     tlb_init(cpu);
+//#ifdef TARGET_CRYPTO_CAP    
+    tlb_init_crca(cpu);
+//#endif
+
 #ifndef CONFIG_USER_ONLY
     tcg_iommu_init_notifier_list(cpu);
 #endif /* !CONFIG_USER_ONLY */
@@ -1091,5 +1095,8 @@ void tcg_exec_unrealizefn(CPUState *cpu)
 #endif /* !CONFIG_USER_ONLY */
 
     tlb_destroy(cpu);
+//#ifdef TARGET_CRYPTO_CAP    
+    tlb_destroy_crca(cpu);
+//#endif
     g_free_rcu(cpu->tb_jmp_cache, rcu);
 }

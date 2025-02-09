@@ -405,6 +405,9 @@ static void dacr_write(CPUARMState *env, const ARMCPRegInfo *ri, uint64_t value)
 
     raw_write(env, ri, value);
     tlb_flush(CPU(cpu)); /* Flush TLB as domain not tracked in TLB */
+//#ifdef TARGET_CRYPTO_CAP
+    tlb_flush_crca(CPU(cpu));
+//#endif
 }
 
 static void fcse_write(CPUARMState *env, const ARMCPRegInfo *ri, uint64_t value)
@@ -417,6 +420,9 @@ static void fcse_write(CPUARMState *env, const ARMCPRegInfo *ri, uint64_t value)
          * not modified virtual addresses, so this causes a TLB flush.
          */
         tlb_flush(CPU(cpu));
+//#ifdef TARGET_CRYPTO_CAP
+        tlb_flush_crca(CPU(cpu));
+//#endif
         raw_write(env, ri, value);
     }
 }
@@ -434,6 +440,10 @@ static void contextidr_write(CPUARMState *env, const ARMCPRegInfo *ri,
          * For PMSA it is purely a process ID and no action is needed.
          */
         tlb_flush(CPU(cpu));
+//#ifdef TARGET_CRYPTO_CAP
+        tlb_flush_crca(CPU(cpu));
+//#endif
+    
     }
     raw_write(env, ri, value);
 }
@@ -460,6 +470,9 @@ static void tlbiall_is_write(CPUARMState *env, const ARMCPRegInfo *ri,
     CPUState *cs = env_cpu(env);
 
     tlb_flush_all_cpus_synced(cs);
+//#ifdef TARGET_CRYPTO_CAP
+    tlb_flush_all_cpus_synced_crca(cs);
+//#endif
 }
 
 static void tlbiasid_is_write(CPUARMState *env, const ARMCPRegInfo *ri,
@@ -468,6 +481,9 @@ static void tlbiasid_is_write(CPUARMState *env, const ARMCPRegInfo *ri,
     CPUState *cs = env_cpu(env);
 
     tlb_flush_all_cpus_synced(cs);
+//#ifdef TARGET_CRYPTO_CAP
+    tlb_flush_all_cpus_synced_crca(cs);
+//#endif
 }
 
 static void tlbimva_is_write(CPUARMState *env, const ARMCPRegInfo *ri,
@@ -476,6 +492,9 @@ static void tlbimva_is_write(CPUARMState *env, const ARMCPRegInfo *ri,
     CPUState *cs = env_cpu(env);
 
     tlb_flush_page_all_cpus_synced(cs, value & TARGET_PAGE_MASK);
+//#ifdef TARGET_CRYPTO_CAP
+    tlb_flush_page_all_cpus_synced_crca(cs, value & TARGET_PAGE_MASK);
+//#endif
 }
 
 static void tlbimvaa_is_write(CPUARMState *env, const ARMCPRegInfo *ri,
@@ -484,6 +503,9 @@ static void tlbimvaa_is_write(CPUARMState *env, const ARMCPRegInfo *ri,
     CPUState *cs = env_cpu(env);
 
     tlb_flush_page_all_cpus_synced(cs, value & TARGET_PAGE_MASK);
+//#ifdef TARGET_CRYPTO_CAP
+    tlb_flush_page_all_cpus_synced_crca(cs, value & TARGET_PAGE_MASK);
+//#endif
 }
 
 /*
@@ -504,8 +526,15 @@ static void tlbiall_write(CPUARMState *env, const ARMCPRegInfo *ri,
 
     if (tlb_force_broadcast(env)) {
         tlb_flush_all_cpus_synced(cs);
+ //#ifdef TARGET_CRYPTO_CAP
+        tlb_flush_all_cpus_synced_crca(cs);
+//#endif
     } else {
         tlb_flush(cs);
+//#ifdef TARGET_CRYPTO_CAP
+        tlb_flush_crca(cs);
+//#endif
+
     }
 }
 
@@ -518,8 +547,14 @@ static void tlbimva_write(CPUARMState *env, const ARMCPRegInfo *ri,
     value &= TARGET_PAGE_MASK;
     if (tlb_force_broadcast(env)) {
         tlb_flush_page_all_cpus_synced(cs, value);
+//#ifdef TARGET_CRYPTO_CAP
+        tlb_flush_page_all_cpus_synced_crca(cs, value);
+//#endif
     } else {
         tlb_flush_page(cs, value);
+//#ifdef TARGET_CRYPTO_CAP
+        tlb_flush_page_crca(cs, value);
+//#endif
     }
 }
 
@@ -531,8 +566,15 @@ static void tlbiasid_write(CPUARMState *env, const ARMCPRegInfo *ri,
 
     if (tlb_force_broadcast(env)) {
         tlb_flush_all_cpus_synced(cs);
+//#ifdef TARGET_CRYPTO_CAP
+        tlb_flush_all_cpus_synced_crca(cs);
+//#endif
+
     } else {
         tlb_flush(cs);
+//#ifdef TARGET_CRYPTO_CAP
+        tlb_flush_crca(cs);
+//#endif
     }
 }
 
@@ -545,8 +587,15 @@ static void tlbimvaa_write(CPUARMState *env, const ARMCPRegInfo *ri,
     value &= TARGET_PAGE_MASK;
     if (tlb_force_broadcast(env)) {
         tlb_flush_page_all_cpus_synced(cs, value);
+//#ifdef TARGET_CRYPTO_CAP
+        tlb_flush_page_all_cpus_synced_crca(cs, value);
+//#endif
     } else {
         tlb_flush_page(cs, value);
+//#ifdef TARGET_CRYPTO_CAP
+        tlb_flush_page_crca(cs, value);
+//#endif
+
     }
 }
 
@@ -556,6 +605,9 @@ static void tlbiall_nsnh_write(CPUARMState *env, const ARMCPRegInfo *ri,
     CPUState *cs = env_cpu(env);
 
     tlb_flush_by_mmuidx(cs, alle1_tlbmask(env));
+//#ifdef TARGET_CRYPTO_CAP
+    tlb_flush_by_mmuidx_crca(cs, alle1_tlbmask(env));
+//#endif
 }
 
 static void tlbiall_nsnh_is_write(CPUARMState *env, const ARMCPRegInfo *ri,
@@ -564,6 +616,10 @@ static void tlbiall_nsnh_is_write(CPUARMState *env, const ARMCPRegInfo *ri,
     CPUState *cs = env_cpu(env);
 
     tlb_flush_by_mmuidx_all_cpus_synced(cs, alle1_tlbmask(env));
+//#ifdef TARGET_CRYPTO_CAP
+    tlb_flush_by_mmuidx_all_cpus_synced_crca(cs, alle1_tlbmask(env));
+//#endif
+
 }
 
 
@@ -573,6 +629,10 @@ static void tlbiall_hyp_write(CPUARMState *env, const ARMCPRegInfo *ri,
     CPUState *cs = env_cpu(env);
 
     tlb_flush_by_mmuidx(cs, ARMMMUIdxBit_E2);
+//#ifdef TARGET_CRYPTO_CAP
+    tlb_flush_by_mmuidx_crca(cs, ARMMMUIdxBit_E2);
+//#endif
+
 }
 
 static void tlbiall_hyp_is_write(CPUARMState *env, const ARMCPRegInfo *ri,
@@ -581,6 +641,10 @@ static void tlbiall_hyp_is_write(CPUARMState *env, const ARMCPRegInfo *ri,
     CPUState *cs = env_cpu(env);
 
     tlb_flush_by_mmuidx_all_cpus_synced(cs, ARMMMUIdxBit_E2);
+//#ifdef TARGET_CRYPTO_CAP
+    tlb_flush_by_mmuidx_all_cpus_synced_crca(cs, ARMMMUIdxBit_E2);
+//#endif
+
 }
 
 static void tlbimva_hyp_write(CPUARMState *env, const ARMCPRegInfo *ri,
@@ -590,6 +654,9 @@ static void tlbimva_hyp_write(CPUARMState *env, const ARMCPRegInfo *ri,
     uint64_t pageaddr = value & ~MAKE_64BIT_MASK(0, 12);
 
     tlb_flush_page_by_mmuidx(cs, pageaddr, ARMMMUIdxBit_E2);
+//#ifdef TARGET_CRYPTO_CAP
+    tlb_flush_page_by_mmuidx_crca(cs, pageaddr, ARMMMUIdxBit_E2);
+//#endif
 }
 
 static void tlbimva_hyp_is_write(CPUARMState *env, const ARMCPRegInfo *ri,
@@ -598,8 +665,10 @@ static void tlbimva_hyp_is_write(CPUARMState *env, const ARMCPRegInfo *ri,
     CPUState *cs = env_cpu(env);
     uint64_t pageaddr = value & ~MAKE_64BIT_MASK(0, 12);
 
-    tlb_flush_page_by_mmuidx_all_cpus_synced(cs, pageaddr,
-                                             ARMMMUIdxBit_E2);
+    tlb_flush_page_by_mmuidx_all_cpus_synced(cs, pageaddr, ARMMMUIdxBit_E2);
+//#ifdef TARGET_CRYPTO_CAP
+    tlb_flush_page_by_mmuidx_all_cpus_synced_crca(cs, pageaddr, ARMMMUIdxBit_E2);
+//#endif
 }
 
 static void tlbiipas2_hyp_write(CPUARMState *env, const ARMCPRegInfo *ri,
@@ -609,6 +678,10 @@ static void tlbiipas2_hyp_write(CPUARMState *env, const ARMCPRegInfo *ri,
     uint64_t pageaddr = (value & MAKE_64BIT_MASK(0, 28)) << 12;
 
     tlb_flush_page_by_mmuidx(cs, pageaddr, ARMMMUIdxBit_Stage2);
+//#ifdef TARGET_CRYPTO_CAP
+    tlb_flush_page_by_mmuidx_crca(cs, pageaddr, ARMMMUIdxBit_Stage2);
+//#endif
+
 }
 
 static void tlbiipas2is_hyp_write(CPUARMState *env, const ARMCPRegInfo *ri,
@@ -618,6 +691,9 @@ static void tlbiipas2is_hyp_write(CPUARMState *env, const ARMCPRegInfo *ri,
     uint64_t pageaddr = (value & MAKE_64BIT_MASK(0, 28)) << 12;
 
     tlb_flush_page_by_mmuidx_all_cpus_synced(cs, pageaddr, ARMMMUIdxBit_Stage2);
+//#ifdef TARGET_CRYPTO_CAP
+    tlb_flush_page_by_mmuidx_all_cpus_synced_crca(cs, pageaddr, ARMMMUIdxBit_Stage2);
+//#endif
 }
 
 static const ARMCPRegInfo cp_reginfo[] = {
@@ -1966,6 +2042,15 @@ static void scr_write(CPUARMState *env, const ARMCPRegInfo *ri, uint64_t value)
                                            ARMMMUIdxBit_E10_1_PAN |
                                            ARMMMUIdxBit_E20_2_PAN |
                                            ARMMMUIdxBit_E2));
+//#ifdef TARGET_CRYPTO_CAP
+        tlb_flush_by_mmuidx_crca(env_cpu(env), (ARMMMUIdxBit_E10_0 |
+                                            ARMMMUIdxBit_E20_0 |
+                                            ARMMMUIdxBit_E10_1 |
+                                            ARMMMUIdxBit_E20_2 |
+                                            ARMMMUIdxBit_E10_1_PAN |
+                                            ARMMMUIdxBit_E20_2_PAN |
+                                            ARMMMUIdxBit_E2));
+//#endif
     }
 }
 
@@ -4002,6 +4087,9 @@ static void pmsav7_write(CPUARMState *env, const ARMCPRegInfo *ri,
 
     u32p += env->pmsav7.rnr[M_REG_NS];
     tlb_flush(CPU(cpu)); /* Mappings may have changed - purge! */
+//#ifdef TARGET_CRYPTO_CAP
+    tlb_flush_crca(CPU(cpu)); /* Mappings may have changed - purge! */
+//#endif
     *u32p = value;
 }
 
@@ -4027,6 +4115,9 @@ static void prbar_write(CPUARMState *env, const ARMCPRegInfo *ri,
     ARMCPU *cpu = env_archcpu(env);
 
     tlb_flush(CPU(cpu)); /* Mappings may have changed - purge! */
+//#ifdef TARGET_CRYPTO_CAP
+    tlb_flush_crca(CPU(cpu)); /* Mappings may have changed - purge! */
+//#endif  
     env->pmsav8.rbar[M_REG_NS][env->pmsav7.rnr[M_REG_NS]] = value;
 }
 
@@ -4041,6 +4132,9 @@ static void prlar_write(CPUARMState *env, const ARMCPRegInfo *ri,
     ARMCPU *cpu = env_archcpu(env);
 
     tlb_flush(CPU(cpu)); /* Mappings may have changed - purge! */
+//#ifdef TARGET_CRYPTO_CAP
+    tlb_flush_crca(CPU(cpu)); /* Mappings may have changed - purge! */
+//#endif
     env->pmsav8.rlar[M_REG_NS][env->pmsav7.rnr[M_REG_NS]] = value;
 }
 
@@ -4085,6 +4179,9 @@ static void hprlar_write(CPUARMState *env, const ARMCPRegInfo *ri,
     ARMCPU *cpu = env_archcpu(env);
 
     tlb_flush(CPU(cpu)); /* Mappings may have changed - purge! */
+    //#ifdef TARGET_CRYPTO_CAP
+    tlb_flush_crca(CPU(cpu)); /* Mappings may have changed - purge! */
+    //#endif
     env->pmsav8.hprlar[env->pmsav8.hprselr] = value;
 }
 
@@ -4105,7 +4202,9 @@ static void hprenr_write(CPUARMState *env, const ARMCPRegInfo *ri,
     value &= MAKE_64BIT_MASK(0, rmax);
 
     tlb_flush(CPU(cpu)); /* Mappings may have changed - purge! */
-
+//#ifdef TARGET_CRYPTO_CAP
+    tlb_flush_crca(CPU(cpu)); /* Mappings may have changed - purge! */
+//#endif
     /* Register alias is only valid for first 32 indexes */
     for (n = 0; n < rmax; ++n) {
         bit = extract32(value, n, 1);
@@ -4153,7 +4252,9 @@ static void pmsav8r_regn_write(CPUARMState *env, const ARMCPRegInfo *ri,
                     (extract32(ri->crm, 0, 3) << 1) | extract32(ri->opc2, 2, 1);
 
     tlb_flush(CPU(cpu)); /* Mappings may have changed - purge! */
-
+//#ifdef TARGET_CRYPTO_CAP
+    tlb_flush_crca(CPU(cpu)); /* Mappings may have changed - purge! */
+//#endif
     if (ri->opc1 & 4) {
         if (index >= cpu->pmsav8r_hdregion) {
             return;
@@ -4345,6 +4446,9 @@ static void vmsa_ttbcr_write(CPUARMState *env, const ARMCPRegInfo *ri,
          * via the TTBCR.A1 bit, so do a TLB flush.
          */
         tlb_flush(CPU(cpu));
+        //#ifdef TARGET_CRYPTO_CAP
+        tlb_flush_crca(CPU(cpu)); /* Mappings may have changed - purge! */
+        //#endif
     }
     raw_write(env, ri, value);
 }
@@ -4356,6 +4460,9 @@ static void vmsa_tcr_el12_write(CPUARMState *env, const ARMCPRegInfo *ri,
 
     /* For AArch64 the A1 bit could result in a change of ASID, so TLB flush. */
     tlb_flush(CPU(cpu));
+//#ifdef TARGET_CRYPTO_CAP
+    tlb_flush_crca(CPU(cpu)); /* Mappings may have changed - purge! */
+//#endif
     raw_write(env, ri, value);
 }
 
@@ -4386,6 +4493,9 @@ static void vmsa_tcr_ttbr_el2_write(CPUARMState *env, const ARMCPRegInfo *ri,
                         ARMMMUIdxBit_E20_2_PAN |
                         ARMMMUIdxBit_E20_0;
         tlb_flush_by_mmuidx(env_cpu(env), mask);
+//#ifdef TARGET_CRYPTO_CAP
+        tlb_flush_by_mmuidx_crca(env_cpu(env), mask);
+//#endif
     }
     raw_write(env, ri, value);
 }
@@ -4402,6 +4512,9 @@ static void vttbr_write(CPUARMState *env, const ARMCPRegInfo *ri,
      */
     if (extract64(raw_read(env, ri) ^ value, 48, 16) != 0) {
         tlb_flush_by_mmuidx(cs, alle1_tlbmask(env));
+//#ifdef TARGET_CRYPTO_CAP
+        tlb_flush_by_mmuidx_crca(cs, alle1_tlbmask(env));
+//#endif
     }
     raw_write(env, ri, value);
 }
@@ -4971,6 +5084,9 @@ static void tlbi_aa64_vmalle1is_write(CPUARMState *env, const ARMCPRegInfo *ri,
     int mask = vae1_tlbmask(env);
 
     tlb_flush_by_mmuidx_all_cpus_synced(cs, mask);
+//#ifdef TARGET_CRYPTO_CAP
+    tlb_flush_by_mmuidx_all_cpus_synced_crca(cs, mask);
+//#endif
 }
 
 static void tlbi_aa64_vmalle1_write(CPUARMState *env, const ARMCPRegInfo *ri,
@@ -4981,8 +5097,14 @@ static void tlbi_aa64_vmalle1_write(CPUARMState *env, const ARMCPRegInfo *ri,
 
     if (tlb_force_broadcast(env)) {
         tlb_flush_by_mmuidx_all_cpus_synced(cs, mask);
+//#ifdef TARGET_CRYPTO_CAP
+        tlb_flush_by_mmuidx_all_cpus_synced_crca(cs, mask);
+//#endif
     } else {
         tlb_flush_by_mmuidx(cs, mask);
+//#ifdef TARGET_CRYPTO_CAP
+        tlb_flush_by_mmuidx_crca(cs, mask);
+//#endif
     }
 }
 
@@ -5001,6 +5123,9 @@ static void tlbi_aa64_alle1_write(CPUARMState *env, const ARMCPRegInfo *ri,
     int mask = alle1_tlbmask(env);
 
     tlb_flush_by_mmuidx(cs, mask);
+//#ifdef TARGET_CRYPTO_CAP
+    tlb_flush_by_mmuidx_crca(cs, mask);
+//#endif
 }
 
 static void tlbi_aa64_alle2_write(CPUARMState *env, const ARMCPRegInfo *ri,
@@ -5010,6 +5135,9 @@ static void tlbi_aa64_alle2_write(CPUARMState *env, const ARMCPRegInfo *ri,
     int mask = e2_tlbmask(env);
 
     tlb_flush_by_mmuidx(cs, mask);
+//#ifdef TARGET_CRYPTO_CAP
+    tlb_flush_by_mmuidx_crca(cs, mask);
+//#endif
 }
 
 static void tlbi_aa64_alle3_write(CPUARMState *env, const ARMCPRegInfo *ri,
@@ -5019,6 +5147,9 @@ static void tlbi_aa64_alle3_write(CPUARMState *env, const ARMCPRegInfo *ri,
     CPUState *cs = CPU(cpu);
 
     tlb_flush_by_mmuidx(cs, ARMMMUIdxBit_E3);
+//#ifdef TARGET_CRYPTO_CAP
+    tlb_flush_by_mmuidx_crca(cs, ARMMMUIdxBit_E3);
+//#endif
 }
 
 static void tlbi_aa64_alle1is_write(CPUARMState *env, const ARMCPRegInfo *ri,
@@ -5028,6 +5159,9 @@ static void tlbi_aa64_alle1is_write(CPUARMState *env, const ARMCPRegInfo *ri,
     int mask = alle1_tlbmask(env);
 
     tlb_flush_by_mmuidx_all_cpus_synced(cs, mask);
+//#ifdef TARGET_CRYPTO_CAP
+    tlb_flush_by_mmuidx_all_cpus_synced_crca(cs, mask);
+//#endif
 }
 
 static void tlbi_aa64_alle2is_write(CPUARMState *env, const ARMCPRegInfo *ri,
@@ -5037,6 +5171,9 @@ static void tlbi_aa64_alle2is_write(CPUARMState *env, const ARMCPRegInfo *ri,
     int mask = e2_tlbmask(env);
 
     tlb_flush_by_mmuidx_all_cpus_synced(cs, mask);
+//#ifdef TARGET_CRYPTO_CAP
+    tlb_flush_by_mmuidx_all_cpus_synced_crca(cs, mask);
+//#endif
 }
 
 static void tlbi_aa64_alle3is_write(CPUARMState *env, const ARMCPRegInfo *ri,
@@ -5045,6 +5182,9 @@ static void tlbi_aa64_alle3is_write(CPUARMState *env, const ARMCPRegInfo *ri,
     CPUState *cs = env_cpu(env);
 
     tlb_flush_by_mmuidx_all_cpus_synced(cs, ARMMMUIdxBit_E3);
+//#ifdef TARGET_CRYPTO_CAP
+    tlb_flush_by_mmuidx_all_cpus_synced_crca(cs, ARMMMUIdxBit_E3);
+//#endif
 }
 
 static void tlbi_aa64_vae2_write(CPUARMState *env, const ARMCPRegInfo *ri,
@@ -5061,6 +5201,9 @@ static void tlbi_aa64_vae2_write(CPUARMState *env, const ARMCPRegInfo *ri,
     int bits = vae2_tlbbits(env, pageaddr);
 
     tlb_flush_page_bits_by_mmuidx(cs, pageaddr, mask, bits);
+//#ifdef TARGET_CRYPTO_CAP
+    tlb_flush_page_bits_by_mmuidx_crca(cs, pageaddr, mask, bits);
+//#endif
 }
 
 static void tlbi_aa64_vae3_write(CPUARMState *env, const ARMCPRegInfo *ri,
@@ -5076,6 +5219,9 @@ static void tlbi_aa64_vae3_write(CPUARMState *env, const ARMCPRegInfo *ri,
     uint64_t pageaddr = sextract64(value << 12, 0, 56);
 
     tlb_flush_page_by_mmuidx(cs, pageaddr, ARMMMUIdxBit_E3);
+//#ifdef TARGET_CRYPTO_CAP
+    tlb_flush_page_by_mmuidx_crca(cs, pageaddr, ARMMMUIdxBit_E3);
+//#endif
 }
 
 static void tlbi_aa64_vae1is_write(CPUARMState *env, const ARMCPRegInfo *ri,
@@ -5087,6 +5233,9 @@ static void tlbi_aa64_vae1is_write(CPUARMState *env, const ARMCPRegInfo *ri,
     int bits = vae1_tlbbits(env, pageaddr);
 
     tlb_flush_page_bits_by_mmuidx_all_cpus_synced(cs, pageaddr, mask, bits);
+//#ifdef TARGET_CRYPTO_CAP
+    tlb_flush_page_bits_by_mmuidx_all_cpus_synced_crca(cs, pageaddr, mask, bits);
+//#endif
 }
 
 static void tlbi_aa64_vae1_write(CPUARMState *env, const ARMCPRegInfo *ri,
@@ -5105,8 +5254,14 @@ static void tlbi_aa64_vae1_write(CPUARMState *env, const ARMCPRegInfo *ri,
 
     if (tlb_force_broadcast(env)) {
         tlb_flush_page_bits_by_mmuidx_all_cpus_synced(cs, pageaddr, mask, bits);
+//#ifdef TARGET_CRYPTO_CAP
+        tlb_flush_page_bits_by_mmuidx_all_cpus_synced_crca(cs, pageaddr, mask, bits);
+//#endif
     } else {
         tlb_flush_page_bits_by_mmuidx(cs, pageaddr, mask, bits);
+//#ifdef TARGET_CRYPTO_CAP
+        tlb_flush_page_bits_by_mmuidx_crca(cs, pageaddr, mask, bits);
+//#endif
     }
 }
 
@@ -5119,6 +5274,9 @@ static void tlbi_aa64_vae2is_write(CPUARMState *env, const ARMCPRegInfo *ri,
     int bits = vae2_tlbbits(env, pageaddr);
 
     tlb_flush_page_bits_by_mmuidx_all_cpus_synced(cs, pageaddr, mask, bits);
+//#ifdef TARGET_CRYPTO_CAP
+    tlb_flush_page_bits_by_mmuidx_all_cpus_synced_crca(cs, pageaddr, mask, bits);
+//#endif
 }
 
 static void tlbi_aa64_vae3is_write(CPUARMState *env, const ARMCPRegInfo *ri,
@@ -5130,6 +5288,10 @@ static void tlbi_aa64_vae3is_write(CPUARMState *env, const ARMCPRegInfo *ri,
 
     tlb_flush_page_bits_by_mmuidx_all_cpus_synced(cs, pageaddr,
                                                   ARMMMUIdxBit_E3, bits);
+//#ifdef TARGET_CRYPTO_CAP
+    tlb_flush_page_bits_by_mmuidx_all_cpus_synced_crca(cs, pageaddr,
+                                                  ARMMMUIdxBit_E3, bits);
+//#endif
 }
 
 static int ipas2e1_tlbmask(CPUARMState *env, int64_t value)
@@ -5154,8 +5316,15 @@ static void tlbi_aa64_ipas2e1_write(CPUARMState *env, const ARMCPRegInfo *ri,
 
     if (tlb_force_broadcast(env)) {
         tlb_flush_page_by_mmuidx_all_cpus_synced(cs, pageaddr, mask);
+//#ifdef TARGET_CRYPTO_CAP
+        tlb_flush_page_by_mmuidx_all_cpus_synced_crca(cs, pageaddr, mask);
+//#endif
     } else {
         tlb_flush_page_by_mmuidx(cs, pageaddr, mask);
+//#ifdef TARGET_CRYPTO_CAP
+        tlb_flush_page_by_mmuidx_crca(cs, pageaddr, mask);
+//#endif
+
     }
 }
 
@@ -5167,6 +5336,9 @@ static void tlbi_aa64_ipas2e1is_write(CPUARMState *env, const ARMCPRegInfo *ri,
     uint64_t pageaddr = sextract64(value << 12, 0, 56);
 
     tlb_flush_page_by_mmuidx_all_cpus_synced(cs, pageaddr, mask);
+//#ifdef TARGET_CRYPTO_CAP
+    tlb_flush_page_by_mmuidx_all_cpus_synced_crca(cs, pageaddr, mask);
+//#endif
 }
 
 #ifdef TARGET_AARCH64
@@ -5254,9 +5426,20 @@ static void do_rvae_write(CPUARMState *env, uint64_t value,
                                                   range.length,
                                                   idxmap,
                                                   bits);
+//#ifdef TARGET_CRYPTO_CAP
+        tlb_flush_range_by_mmuidx_all_cpus_synced(env_cpu(env),
+                                                  range.base,
+                                                  range.length,
+                                                  idxmap,
+                                                  bits);
+//#endif
     } else {
         tlb_flush_range_by_mmuidx(env_cpu(env), range.base,
                                   range.length, idxmap, bits);
+//#ifdef TARGET_CRYPTO_CAP
+        tlb_flush_range_by_mmuidx_crca(env_cpu(env), range.base,
+                                  range.length, idxmap, bits);
+//#endif
     }
 }
 
@@ -5461,7 +5644,9 @@ static void sctlr_write(CPUARMState *env, const ARMCPRegInfo *ri,
 
     /* This may enable/disable the MMU, so do a TLB flush.  */
     tlb_flush(CPU(cpu));
-
+//#ifdef TARGET_CRYPTO_CAP
+    tlb_flush_crca(CPU(cpu)); /* Mappings may have changed - purge! */
+//#endif
     if (tcg_enabled() && ri->type & ARM_CP_SUPPRESS_TB_END) {
         /*
          * Normally we would always end the TB on an SCTLR write; see the
@@ -6037,6 +6222,9 @@ static void do_hcr_write(CPUARMState *env, uint64_t value, uint64_t valid_mask)
     if ((env->cp15.hcr_el2 ^ value) &
         (HCR_VM | HCR_PTW | HCR_DC | HCR_DCT | HCR_FWB | HCR_NV | HCR_NV1)) {
         tlb_flush(CPU(cpu));
+    //#ifdef TARGET_CRYPTO_CAP
+        tlb_flush_crca(CPU(cpu)); /* Mappings may have changed - purge! */
+    //#endif
     }
     env->cp15.hcr_el2 = value;
 
@@ -7424,6 +7612,9 @@ static void tlbi_aa64_paall_write(CPUARMState *env, const ARMCPRegInfo *ri,
     CPUState *cs = env_cpu(env);
 
     tlb_flush(cs);
+//#ifdef TARGET_CRYPTO_CAP
+    tlb_flush_crca(cs); /* Mappings may have changed - purge! */
+//#endif
 }
 
 static void gpccr_write(CPUARMState *env, const ARMCPRegInfo *ri,
@@ -7449,6 +7640,9 @@ static void tlbi_aa64_paallos_write(CPUARMState *env, const ARMCPRegInfo *ri,
     CPUState *cs = env_cpu(env);
 
     tlb_flush_all_cpus_synced(cs);
+//#ifdef TARGET_CRYPTO_CAP
+    tlb_flush_all_cpus_synced_crca(cs);
+//#endif
 }
 
 static const ARMCPRegInfo rme_reginfo[] = {

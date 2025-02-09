@@ -2538,6 +2538,12 @@ void HELPER(cldg)(CPUARMState *env, uint64_t size_idx, uint64_t r_idx, uint64_t 
         env->cc_tcrel1=env->cp15.tcr_el[1];
         uint64_t tcr_el1=env->cp15.tcr_el[1];
         
+        uint64_t asid=PT;
+        asid>>=48;
+        asid<<=48;
+        //addr|=asid;
+        
+
         //E0PD0, bit [55] FEAT_E0PD:  Unprivileged access to any address translated by TTBR0_EL1 will not generate a fault by this mechanism.
         //HD, bit [40] FEAT_HAFDBS: Stage 1 hardware management of dirty state disabled.
         //HA, bit [39] FEAT_HAFDBS: Stage 1 Access flag update disabled.
@@ -2559,7 +2565,7 @@ void HELPER(cldg)(CPUARMState *env, uint64_t size_idx, uint64_t r_idx, uint64_t 
                 lvalue = cpu_lduw_data(env, addr);
                 break;
             case 3:
-                lvalue = cpu_ldub_data_cc(env, addr);
+                lvalue = cpu_ldub_data_crca(env, addr);
                 //lvalue = cpu_ldub_data(env, addr);
                 break;
             default:
@@ -2712,6 +2718,7 @@ void HELPER(dcall)(CPUARMState *env, uint64_t curr_pc)
     // env->cp15.mair_el[1]=env->dclc.FIELD[10]; //set to callee MAIR_EL1
 
     tlb_flush(env_cpu(env));
+    tlb_flush_crca(env_cpu(env));
     arm_rebuild_hflags(env);
     return;
 }
@@ -2735,6 +2742,7 @@ void HELPER(dret)(CPUARMState *env)
     // env->cp15.mair_el[1]=env->dclr.FIELD[10]; //restore to callee MAIR_EL1
 
     tlb_flush(env_cpu(env));
+    tlb_flush_crca(env_cpu(env));
     arm_rebuild_hflags(env);
 
     return;

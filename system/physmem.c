@@ -593,6 +593,9 @@ static void tcg_iommu_unmap_notify(IOMMUNotifier *n, IOMMUTLBEntry *iotlb)
         return;
     }
     tlb_flush(notifier->cpu);
+//#ifdef TARGET_CRYPTO_CAP
+    tlb_flush_crca(notifier->cpu);
+//#endif
     notifier->active = false;
     /* We leave the notifier struct on the list to avoid reallocating it later.
      * Generally the number of IOMMUs a CPU deals with will be small.
@@ -2520,6 +2523,9 @@ static void tcg_commit_cpu(CPUState *cpu, run_on_cpu_data data)
 
     cpuas->memory_dispatch = address_space_to_dispatch(cpuas->as);
     tlb_flush(cpu);
+//#ifdef TARGET_CRYPTO_CAP
+    tlb_flush_crca(cpu);
+//#endif
 }
 
 static void tcg_commit(MemoryListener *listener)

@@ -785,7 +785,9 @@ typedef struct CPUArchState {
 
     /* Optional fault info across tlb lookup. */
     ARMMMUFaultInfo *tlb_fi;
-
+//#ifdef TARGET_CRYPTO_CAP
+    ARMMMUFaultInfo *tlb_fi_crca;
+//#endif
     /* Fields up to this point are cleared by a CPU reset */
     struct {} end_reset_fields;
 

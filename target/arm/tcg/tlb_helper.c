@@ -373,6 +373,61 @@ bool arm_cpu_tlb_fill(CPUState *cs, vaddr address, int size,
     }
 }
 
+
+bool arm_cpu_tlb_fill_crca(CPUState *cs, vaddr address, int size,
+                      MMUAccessType access_type, int mmu_idx,
+                      bool probe, uintptr_t retaddr)
+{
+    ARMCPU *cpu = ARM_CPU(cs);
+    GetPhysAddrResult res = {};
+    ARMMMUFaultInfo local_fi, *fi;
+    int ret;
+
+    /*
+     * Allow S1_ptw_translate to see any fault generated here.
+     * Since this may recurse, read and clear.
+     */
+    fi = cpu->env.tlb_fi_crca;
+    if (fi) {
+        cpu->env.tlb_fi_crca = NULL;
+    } else {
+        fi = memset(&local_fi, 0, sizeof(local_fi));
+    }
+
+    /*
+     * Walk the page table and (if the mapping exists) add the page
+     * to the TLB.  On success, return true.  Otherwise, if probing,
+     * return false.  Otherwise populate fsr with ARM DFSR/IFSR fault
+     * register format, and signal the fault.
+     */
+    ret = get_phys_addr(&cpu->env, address, access_type,
+                        core_to_arm_mmu_idx(&cpu->env, mmu_idx),
+                        &res, fi);
+    if (likely(!ret)) {
+        /*
+         * Map a single [sub]page. Regions smaller than our declared
+        S1_ptw_translate * target page size are handled specially, so for those we
+         * pass in the exact addresses.
+         */
+        if (res.f.lg_page_size >= TARGET_PAGE_BITS) {
+            res.f.phys_addr &= TARGET_PAGE_MASK;
+            address &= TARGET_PAGE_MASK;
+        }
+
+        res.f.extra.arm.pte_attrs = res.cacheattrs.attrs;
+        res.f.extra.arm.shareability = res.cacheattrs.shareability;
+        tlb_set_page_full_crca(cs, mmu_idx, address, &res.f);
+
+        return true;
+    } else if (probe) {
+        return false;
+    } else {
+        /* now we have a real cpu fault */
+        cpu_restore_state(cs, retaddr);
+        arm_deliver_fault(cpu, address, access_type, mmu_idx, fi);
+    }
+}
+
 bool arm_cpu_tlb_skip_cc(CPUState *cs, vaddr address, int size,
                       MMUAccessType access_type, int mmu_idx,
                       bool probe, uintptr_t retaddr, CPUTLB* tlb_skipped, CPUTLBEntryFull* full, CPUTLBEntry* entry)

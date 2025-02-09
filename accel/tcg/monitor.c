@@ -141,6 +141,21 @@ static void tlb_flush_counts(size_t *pfull, size_t *ppart, size_t *pelide)
     *pelide = elide;
 }
 
+static void tlb_flush_counts_crca(size_t *pfull, size_t *ppart, size_t *pelide)
+{
+    CPUState *cpu;
+    size_t full = 0, part = 0, elide = 0;
+
+    CPU_FOREACH(cpu) {
+        full += qatomic_read(&cpu->neg.tlb_crca.c.full_flush_count);
+        part += qatomic_read(&cpu->neg.tlb_crca.c.part_flush_count);
+        elide += qatomic_read(&cpu->neg.tlb_crca.c.elide_flush_count);
+    }
+    *pfull = full;
+    *ppart = part;
+    *pelide = elide;
+}
+
 static void tcg_dump_info(GString *buf)
 {
     g_string_append_printf(buf, "[TCG profiler not compiled]\n");

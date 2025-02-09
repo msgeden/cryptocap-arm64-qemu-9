@@ -78,6 +78,13 @@ static bool get_phys_addr_nogpc(CPUARMState *env, S1Translate *ptw,
                                 GetPhysAddrResult *result,
                                 ARMMMUFaultInfo *fi);
 
+static bool get_phys_addr_nogpc_crca(CPUARMState *env, S1Translate *ptw,
+                                    target_ulong address,
+                                    MMUAccessType access_type,
+                                    GetPhysAddrResult *result,
+                                    ARMMMUFaultInfo *fi);
+    
+
 static bool get_phys_addr_nogpc_cc(CPUARMState *env, S1Translate *ptw,
                                 target_ulong address,
                                 MMUAccessType access_type,
@@ -92,6 +99,13 @@ static bool get_phys_addr_gpc(CPUARMState *env, S1Translate *ptw,
                               ARMMMUFaultInfo *fi);
 
 
+static bool get_phys_addr_gpc_crca(CPUARMState *env, S1Translate *ptw,
+                                target_ulong address,
+                                MMUAccessType access_type,
+                                GetPhysAddrResult *result,
+                                ARMMMUFaultInfo *fi);
+  
+  
 static bool get_phys_addr_gpc_cc(CPUARMState *env, S1Translate *ptw,
                               target_ulong address,
                               MMUAccessType access_type,
@@ -231,6 +245,12 @@ static uint64_t regime_ttbr(CPUARMState *env, ARMMMUIdx mmu_idx, int ttbrn)
 //#ifdef TARGET_CRYPTO_CAP
     }
 //#endif
+}
+
+/* Return the TTBR associated with this translation regime */
+static uint64_t regime_ttbr_crca(CPUARMState *env, ARMMMUIdx mmu_idx, int ttbrn)
+{
+    return env->cc_ttbr0;
 }
 
 /* Return the TTBR associated with this translation regime */
@@ -664,6 +684,95 @@ static bool S1_ptw_translate(CPUARMState *env, S1Translate *ptw,
     return false;
 }
 
+
+/* Translate a S1 pagetable walk through S2 if needed.  */
+static bool S1_ptw_translate_crca(CPUARMState *env, S1Translate *ptw,
+                             hwaddr addr, ARMMMUFaultInfo *fi)
+{
+    ARMMMUIdx mmu_idx = ptw->in_mmu_idx;
+    ARMMMUIdx s2_mmu_idx = ptw->in_ptw_idx;
+    uint8_t pte_attrs;
+
+    ptw->out_virt = addr;
+    if (unlikely(ptw->in_debug)) {
+        /*
+         * From gdbstub, do not use softmmu so that we don't modify the
+         * state of the cpu at all, including softmmu tlb contents.
+         */
+        ARMSecuritySpace s2_space = S2_security_space(ptw->in_space, s2_mmu_idx);
+        S1Translate s2ptw = {
+            .in_mmu_idx = s2_mmu_idx,
+            .in_ptw_idx = ptw_idx_for_stage_2(env, s2_mmu_idx),
+            .in_space = s2_space,
+            .in_debug = true,
+        };
+        GetPhysAddrResult s2 = { };
+
+        if (get_phys_addr_gpc_crca(env, &s2ptw, addr, MMU_DATA_LOAD, &s2, fi)) {
+            goto fail;
+        }
+
+        ptw->out_phys = s2.f.phys_addr;
+        pte_attrs = s2.cacheattrs.attrs;
+        ptw->out_host = NULL;
+        ptw->out_rw = false;
+        ptw->out_space = s2.f.attrs.space;
+    } else {
+#ifdef CONFIG_TCG
+        //TARGET_CRYPTO_CAP:  check TLB first 
+        CPUTLBEntryFull *full;
+        int flags;
+
+        env->tlb_fi_crca = fi;
+        flags = probe_access_full_mmu_crca(env, addr, 0, MMU_DATA_LOAD,
+                                      arm_to_core_mmu_idx(s2_mmu_idx),
+                                      &ptw->out_host, &full);
+        env->tlb_fi_crca = NULL;
+
+        if (unlikely(flags & TLB_INVALID_MASK)) {
+            goto fail;
+        }
+        ptw->out_phys = full->phys_addr | (addr & ~TARGET_PAGE_MASK);
+        ptw->out_rw = full->prot & PAGE_WRITE;
+        pte_attrs = full->extra.arm.pte_attrs;
+        ptw->out_space = full->attrs.space;
+#else
+        g_assert_not_reached();
+#endif
+    }
+
+    if (regime_is_stage2(s2_mmu_idx)) {
+        uint64_t hcr = arm_hcr_el2_eff_secstate(env, ptw->in_space);
+
+        if ((hcr & HCR_PTW) && S2_attrs_are_device(hcr, pte_attrs)) {
+            /*
+             * PTW set and S1 walk touched S2 Device memory:
+             * generate Permission fault.
+             */
+            fi->type = ARMFault_Permission;
+            fi->s2addr = addr;
+            fi->stage2 = true;
+            fi->s1ptw = true;
+            fi->s1ns = fault_s1ns(ptw->in_space, s2_mmu_idx);
+            return false;
+        }
+    }
+
+    ptw->out_be = regime_translation_big_endian(env, mmu_idx);
+    return true;
+
+ fail:
+    assert(fi->type != ARMFault_None);
+    if (fi->type == ARMFault_GPCFOnOutput) {
+        fi->type = ARMFault_GPCFOnWalk;
+    }
+    fi->s2addr = addr;
+    fi->stage2 = regime_is_stage2(s2_mmu_idx);
+    fi->s1ptw = fi->stage2;
+    fi->s1ns = fault_s1ns(ptw->in_space, s2_mmu_idx);
+    return false;
+}
+
 //#ifdef TARGET_CRYPTO_CAP
 /* Translate a S1 pagetable walk through S2 if needed.  */
 static bool S1_ptw_translate_cc(CPUARMState *env, S1Translate *ptw,
@@ -995,6 +1104,162 @@ static uint64_t arm_casq_ptw(CPUARMState *env, uint64_t old_val,
 #endif
 }
 
+
+
+static uint64_t arm_casq_ptw_crca(CPUARMState *env, uint64_t old_val,
+                             uint64_t new_val, S1Translate *ptw,
+                             ARMMMUFaultInfo *fi)
+{
+#if defined(TARGET_AARCH64) && defined(CONFIG_TCG)
+    uint64_t cur_val;
+    void *host = ptw->out_host;
+
+    if (unlikely(!host)) {
+        /* Page table in MMIO Memory Region */
+        CPUState *cs = env_cpu(env);
+        MemTxAttrs attrs = {
+            .space = ptw->out_space,
+            .secure = arm_space_is_secure(ptw->out_space),
+        };
+        AddressSpace *as = arm_addressspace(cs, attrs);
+        MemTxResult result = MEMTX_OK;
+        bool need_lock = !bql_locked();
+
+        if (need_lock) {
+            bql_lock();
+        }
+        if (ptw->out_be) {
+            cur_val = address_space_ldq_be(as, ptw->out_phys, attrs, &result);
+            if (unlikely(result != MEMTX_OK)) {
+                fi->type = ARMFault_SyncExternalOnWalk;
+                fi->ea = arm_extabort_type(result);
+                if (need_lock) {
+                    bql_unlock();
+                }
+                return old_val;
+            }
+            if (cur_val == old_val) {
+                address_space_stq_be(as, ptw->out_phys, new_val, attrs, &result);
+                if (unlikely(result != MEMTX_OK)) {
+                    fi->type = ARMFault_SyncExternalOnWalk;
+                    fi->ea = arm_extabort_type(result);
+                    if (need_lock) {
+                        bql_unlock();
+                    }
+                    return old_val;
+                }
+                cur_val = new_val;
+            }
+        } else {
+            cur_val = address_space_ldq_le(as, ptw->out_phys, attrs, &result);
+            if (unlikely(result != MEMTX_OK)) {
+                fi->type = ARMFault_SyncExternalOnWalk;
+                fi->ea = arm_extabort_type(result);
+                if (need_lock) {
+                    bql_unlock();
+                }
+                return old_val;
+            }
+            if (cur_val == old_val) {
+                address_space_stq_le(as, ptw->out_phys, new_val, attrs, &result);
+                if (unlikely(result != MEMTX_OK)) {
+                    fi->type = ARMFault_SyncExternalOnWalk;
+                    fi->ea = arm_extabort_type(result);
+                    if (need_lock) {
+                        bql_unlock();
+                    }
+                    return old_val;
+                }
+                cur_val = new_val;
+            }
+        }
+        if (need_lock) {
+            bql_unlock();
+        }
+        return cur_val;
+    }
+
+    /*
+     * Raising a stage2 Protection fault for an atomic update to a read-only
+     * page is delayed until it is certain that there is a change to make.
+     */
+    if (unlikely(!ptw->out_rw)) {
+        int flags;
+
+        env->tlb_fi_crca = fi;
+        flags = probe_access_full_mmu_crca(env, ptw->out_virt, 0,
+                                      MMU_DATA_STORE,
+                                      arm_to_core_mmu_idx(ptw->in_ptw_idx),
+                                      NULL, NULL);
+        env->tlb_fi_crca = NULL;
+
+        if (unlikely(flags & TLB_INVALID_MASK)) {
+            /*
+             * We know this must be a stage 2 fault because the granule
+             * protection table does not separately track read and write
+             * permission, so all GPC faults are caught in S1_ptw_translate():
+             * we only get here for "readable but not writeable".
+             */
+            assert(fi->type != ARMFault_None);
+            fi->s2addr = ptw->out_virt;
+            fi->stage2 = true;
+            fi->s1ptw = true;
+            fi->s1ns = fault_s1ns(ptw->in_space, ptw->in_ptw_idx);
+            return 0;
+        }
+
+        /* In case CAS mismatches and we loop, remember writability. */
+        ptw->out_rw = true;
+    }
+
+#ifdef CONFIG_ATOMIC64
+    if (ptw->out_be) {
+        old_val = cpu_to_be64(old_val);
+        new_val = cpu_to_be64(new_val);
+        cur_val = qatomic_cmpxchg__nocheck((uint64_t *)host, old_val, new_val);
+        cur_val = be64_to_cpu(cur_val);
+    } else {
+        old_val = cpu_to_le64(old_val);
+        new_val = cpu_to_le64(new_val);
+        cur_val = qatomic_cmpxchg__nocheck((uint64_t *)host, old_val, new_val);
+        cur_val = le64_to_cpu(cur_val);
+    }
+#else
+    /*
+     * We can't support the full 64-bit atomic cmpxchg on the host.
+     * Because this is only used for FEAT_HAFDBS, which is only for AA64,
+     * we know that TCG_OVERSIZED_GUEST is set, which means that we are
+     * running in round-robin mode and could only race with dma i/o.
+     */
+#if !TCG_OVERSIZED_GUEST
+# error "Unexpected configuration"
+#endif
+    bool locked = bql_locked();
+    if (!locked) {
+        bql_lock();
+    }
+    if (ptw->out_be) {
+        cur_val = ldq_be_p(host);
+        if (cur_val == old_val) {
+            stq_be_p(host, new_val);
+        }
+    } else {
+        cur_val = ldq_le_p(host);
+        if (cur_val == old_val) {
+            stq_le_p(host, new_val);
+        }
+    }
+    if (!locked) {
+        bql_unlock();
+    }
+#endif
+
+    return cur_val;
+#else
+    /* AArch32 does not have FEAT_HADFS; non-TCG guests only use debug-mode. */
+    g_assert_not_reached();
+#endif
+}
 static bool get_level1_table_address(CPUARMState *env, ARMMMUIdx mmu_idx,
                                      uint32_t *table, uint32_t address)
 {
@@ -2223,6 +2488,541 @@ static bool get_phys_addr_lpae(CPUARMState *env, S1Translate *ptw,
     /* If FEAT_HAFDBS has made changes, update the PTE. */
     if (new_descriptor != descriptor) {
         new_descriptor = arm_casq_ptw(env, descriptor, new_descriptor, ptw, fi);
+        if (fi->type != ARMFault_None) {
+            goto do_fault;
+        }
+        /*
+         * I_YZSVV says that if the in-memory descriptor has changed,
+         * then we must use the information in that new value
+         * (which might include a different output address, different
+         * attributes, or generate a fault).
+         * Restart the handling of the descriptor value from scratch.
+         */
+        if (new_descriptor != descriptor) {
+            descriptor = new_descriptor;
+            goto restart_atomic_update;
+        }
+    }
+
+    result->f.attrs.space = out_space;
+    result->f.attrs.secure = arm_space_is_secure(out_space);
+
+    if (regime_is_stage2(mmu_idx)) {
+        result->cacheattrs.is_s2_format = true;
+        result->cacheattrs.attrs = extract32(attrs, 2, 4);
+        /*
+         * Security state does not really affect HCR_EL2.FWB;
+         * we only need to filter FWB for aa32 or other FEAT.
+         */
+        device = S2_attrs_are_device(arm_hcr_el2_eff(env),
+                                     result->cacheattrs.attrs);
+    } else {
+        /* Index into MAIR registers for cache attributes */
+        uint8_t attrindx = extract32(attrs, 2, 3);
+        uint64_t mair = env->cp15.mair_el[regime_el(env, mmu_idx)];
+        assert(attrindx <= 7);
+        result->cacheattrs.is_s2_format = false;
+        result->cacheattrs.attrs = extract64(mair, attrindx * 8, 8);
+
+        /* When in aarch64 mode, and BTI is enabled, remember GP in the TLB. */
+        if (aarch64 && cpu_isar_feature(aa64_bti, cpu)) {
+            result->f.extra.arm.guarded = extract64(attrs, 50, 1); /* GP */
+        }
+        device = S1_attrs_are_device(result->cacheattrs.attrs);
+    }
+
+    /*
+     * Enable alignment checks on Device memory.
+     *
+     * Per R_XCHFJ, this check is mis-ordered. The correct ordering
+     * for alignment, permission, and stage 2 faults should be:
+     *    - Alignment fault caused by the memory type
+     *    - Permission fault
+     *    - A stage 2 fault on the memory access
+     * but due to the way the TCG softmmu TLB operates, we will have
+     * implicitly done the permission check and the stage2 lookup in
+     * finding the TLB entry, so the alignment check cannot be done sooner.
+     *
+     * In v7, for a CPU without the Virtualization Extensions this
+     * access is UNPREDICTABLE; we choose to make it take the alignment
+     * fault as is required for a v7VE CPU. (QEMU doesn't emulate any
+     * CPUs with ARM_FEATURE_LPAE but not ARM_FEATURE_V7VE anyway.)
+     */
+    if (device) {
+        result->f.tlb_fill_flags |= TLB_CHECK_ALIGNED;
+    }
+
+    /*
+     * For FEAT_LPA2 and effective DS, the SH field in the attributes
+     * was re-purposed for output address bits.  The SH attribute in
+     * that case comes from TCR_ELx, which we extracted earlier.
+     */
+    if (param.ds) {
+        result->cacheattrs.shareability = param.sh;
+    } else {
+        result->cacheattrs.shareability = extract32(attrs, 8, 2);
+    }
+
+    result->f.phys_addr = descaddr;
+    result->f.lg_page_size = ctz64(page_size);
+    return false;
+
+ do_translation_fault:
+    fi->type = ARMFault_Translation;
+ do_fault:
+    if (fi->s1ptw) {
+        /* Retain the existing stage 2 fi->level */
+        assert(fi->stage2);
+    } else {
+        fi->level = level;
+        fi->stage2 = regime_is_stage2(mmu_idx);
+    }
+    fi->s1ns = fault_s1ns(ptw->in_space, mmu_idx);
+    return true;
+}
+
+
+
+/**
+ * get_phys_addr_lpae: perform one stage of page table walk, LPAE format
+ *
+ * Returns false if the translation was successful. Otherwise, phys_ptr,
+ * attrs, prot and page_size may not be filled in, and the populated fsr
+ * value provides information on why the translation aborted, in the format
+ * of a long-format DFSR/IFSR fault register, with the following caveat:
+ * the WnR bit is never set (the caller must do this).
+ *
+ * @env: CPUARMState
+ * @ptw: Current and next stage parameters for the walk.
+ * @address: virtual address to get physical address for
+ * @access_type: MMU_DATA_LOAD, MMU_DATA_STORE or MMU_INST_FETCH
+ * @result: set on translation success,
+ * @fi: set to fault info if the translation fails
+ */
+static bool get_phys_addr_lpae_crca(CPUARMState *env, S1Translate *ptw,
+                               uint64_t address,
+                               MMUAccessType access_type,
+                               GetPhysAddrResult *result, ARMMMUFaultInfo *fi)
+{
+    ARMCPU *cpu = env_archcpu(env);
+    ARMMMUIdx mmu_idx = ptw->in_mmu_idx;
+    int32_t level;
+    ARMVAParameters param;
+    uint64_t ttbr;
+    hwaddr descaddr, indexmask, indexmask_grainsize;
+    uint32_t tableattrs;
+    target_ulong page_size;
+    uint64_t attrs;
+    int32_t stride;
+    int addrsize, inputsize, outputsize;
+    uint64_t tcr = regime_tcr_crca(env, mmu_idx);
+    int ap, xn, pxn;
+    uint32_t el = regime_el(env, mmu_idx);
+    uint64_t descaddrmask;
+    bool aarch64 = arm_el_is_aa64(env, el);
+    uint64_t descriptor, new_descriptor;
+    ARMSecuritySpace out_space;
+    bool device;
+
+    /* TODO: This code does not support shareability levels. */
+    if (aarch64) {
+        int ps;
+
+        param = aa64_va_parameters(env, address, mmu_idx,
+                                   access_type != MMU_INST_FETCH,
+                                   !arm_el_is_aa64(env, 1));
+        level = 0;
+
+        /*
+         * If TxSZ is programmed to a value larger than the maximum,
+         * or smaller than the effective minimum, it is IMPLEMENTATION
+         * DEFINED whether we behave as if the field were programmed
+         * within bounds, or if a level 0 Translation fault is generated.
+         *
+         * With FEAT_LVA, fault on less than minimum becomes required,
+         * so our choice is to always raise the fault.
+         */
+        if (param.tsz_oob) {
+            goto do_translation_fault;
+        }
+
+        addrsize = 64 - 8 * param.tbi;
+        inputsize = 64 - param.tsz;
+
+        /*
+         * Bound PS by PARANGE to find the effective output address size.
+         * ID_AA64MMFR0 is a read-only register so values outside of the
+         * supported mappings can be considered an implementation error.
+         */
+        ps = FIELD_EX64(cpu->isar.id_aa64mmfr0, ID_AA64MMFR0, PARANGE);
+        ps = MIN(ps, param.ps);
+        assert(ps < ARRAY_SIZE(pamax_map));
+        outputsize = pamax_map[ps];
+
+        /*
+         * With LPA2, the effective output address (OA) size is at most 48 bits
+         * unless TCR.DS == 1
+         */
+        if (!param.ds && param.gran != Gran64K) {
+            outputsize = MIN(outputsize, 48);
+        }
+    } else {
+        param = aa32_va_parameters(env, address, mmu_idx);
+        level = 1;
+        addrsize = (mmu_idx == ARMMMUIdx_Stage2 ? 40 : 32);
+        inputsize = addrsize - param.tsz;
+        outputsize = 40;
+    }
+
+    /*
+     * We determined the region when collecting the parameters, but we
+     * have not yet validated that the address is valid for the region.
+     * Extract the top bits and verify that they all match select.
+     *
+     * For aa32, if inputsize == addrsize, then we have selected the
+     * region by exclusion in aa32_va_parameters and there is no more
+     * validation to do here.
+     */
+    if (inputsize < addrsize) {
+        target_ulong top_bits = sextract64(address, inputsize,
+                                           addrsize - inputsize);
+        if (-top_bits != param.select) {
+            /* The gap between the two regions is a Translation fault */
+            goto do_translation_fault;
+        }
+    }
+
+    stride = arm_granule_bits(param.gran) - 3;
+
+    /*
+     * Note that QEMU ignores shareability and cacheability attributes,
+     * so we don't need to do anything with the SH, ORGN, IRGN fields
+     * in the TTBCR.  Similarly, TTBCR:A1 selects whether we get the
+     * ASID from TTBR0 or TTBR1, but QEMU's TLB doesn't currently
+     * implement any ASID-like capability so we can ignore it (instead
+     * we will always flush the TLB any time the ASID is changed).
+     */
+    ttbr = regime_ttbr_crca(env, mmu_idx, param.select);
+
+    /*
+     * Here we should have set up all the parameters for the translation:
+     * inputsize, ttbr, epd, stride, tbi
+     */
+
+    if (param.epd) {
+        /*
+         * Translation table walk disabled => Translation fault on TLB miss
+         * Note: This is always 0 on 64-bit EL2 and EL3.
+         */
+        goto do_translation_fault;
+    }
+
+    if (!regime_is_stage2(mmu_idx)) {
+        /*
+         * The starting level depends on the virtual address size (which can
+         * be up to 48 bits) and the translation granule size. It indicates
+         * the number of strides (stride bits at a time) needed to
+         * consume the bits of the input address. In the pseudocode this is:
+         *  level = 4 - RoundUp((inputsize - grainsize) / stride)
+         * where their 'inputsize' is our 'inputsize', 'grainsize' is
+         * our 'stride + 3' and 'stride' is our 'stride'.
+         * Applying the usual "rounded up m/n is (m+n-1)/n" and simplifying:
+         * = 4 - (inputsize - stride - 3 + stride - 1) / stride
+         * = 4 - (inputsize - 4) / stride;
+         */
+        level = 4 - (inputsize - 4) / stride;
+    } else {
+        int startlevel = check_s2_mmu_setup(cpu, aarch64, tcr, param.ds,
+                                            inputsize, stride);
+        if (startlevel == INT_MIN) {
+            level = 0;
+            goto do_translation_fault;
+        }
+        level = startlevel;
+    }
+
+    indexmask_grainsize = MAKE_64BIT_MASK(0, stride + 3);
+    indexmask = MAKE_64BIT_MASK(0, inputsize - (stride * (4 - level)));
+
+    /* Now we can extract the actual base address from the TTBR */
+    descaddr = extract64(ttbr, 0, 48);
+
+    /*
+     * For FEAT_LPA and PS=6, bits [51:48] of descaddr are in [5:2] of TTBR.
+     *
+     * Otherwise, if the base address is out of range, raise AddressSizeFault.
+     * In the pseudocode, this is !IsZero(baseregister<47:outputsize>),
+     * but we've just cleared the bits above 47, so simplify the test.
+     */
+    if (outputsize > 48) {
+        descaddr |= extract64(ttbr, 2, 4) << 48;
+    } else if (descaddr >> outputsize) {
+        level = 0;
+        fi->type = ARMFault_AddressSize;
+        goto do_fault;
+    }
+
+    /*
+     * We rely on this masking to clear the RES0 bits at the bottom of the TTBR
+     * and also to mask out CnP (bit 0) which could validly be non-zero.
+     */
+    descaddr &= ~indexmask;
+
+    /*
+     * For AArch32, the address field in the descriptor goes up to bit 39
+     * for both v7 and v8.  However, for v8 the SBZ bits [47:40] must be 0
+     * or an AddressSize fault is raised.  So for v8 we extract those SBZ
+     * bits as part of the address, which will be checked via outputsize.
+     * For AArch64, the address field goes up to bit 47, or 49 with FEAT_LPA2;
+     * the highest bits of a 52-bit output are placed elsewhere.
+     */
+    if (param.ds) {
+        descaddrmask = MAKE_64BIT_MASK(0, 50);
+    } else if (arm_feature(env, ARM_FEATURE_V8)) {
+        descaddrmask = MAKE_64BIT_MASK(0, 48);
+    } else {
+        descaddrmask = MAKE_64BIT_MASK(0, 40);
+    }
+    descaddrmask &= ~indexmask_grainsize;
+    tableattrs = 0;
+
+ next_level:
+    descaddr |= (address >> (stride * (4 - level))) & indexmask;
+    descaddr &= ~7ULL;
+
+    /*
+     * Process the NSTable bit from the previous level.  This changes
+     * the table address space and the output space from Secure to
+     * NonSecure.  With RME, the EL3 translation regime does not change
+     * from Root to NonSecure.
+     */
+    if (ptw->in_space == ARMSS_Secure
+        && !regime_is_stage2(mmu_idx)
+        && extract32(tableattrs, 4, 1)) {
+        /*
+         * Stage2_S -> Stage2 or Phys_S -> Phys_NS
+         * Assert the relative order of the secure/non-secure indexes.
+         */
+        QEMU_BUILD_BUG_ON(ARMMMUIdx_Phys_S + 1 != ARMMMUIdx_Phys_NS);
+        QEMU_BUILD_BUG_ON(ARMMMUIdx_Stage2_S + 1 != ARMMMUIdx_Stage2);
+        ptw->in_ptw_idx += 1;
+        ptw->in_space = ARMSS_NonSecure;
+    }
+    if (!S1_ptw_translate(env, ptw, descaddr, fi)) {
+        goto do_fault;
+    }
+  
+    descriptor = arm_ldq_ptw(env, ptw, fi);
+    if (fi->type != ARMFault_None) {
+        goto do_fault;
+    }
+    new_descriptor = descriptor;
+
+ restart_atomic_update:
+    if (!(descriptor & 1) ||
+        (!(descriptor & 2) &&
+         !lpae_block_desc_valid(cpu, param.ds, param.gran, level))) {
+        /* Invalid, or a block descriptor at an invalid level */
+        goto do_translation_fault;
+    }
+
+    descaddr = descriptor & descaddrmask;
+
+    /*
+     * For FEAT_LPA and PS=6, bits [51:48] of descaddr are in [15:12]
+     * of descriptor.  For FEAT_LPA2 and effective DS, bits [51:50] of
+     * descaddr are in [9:8].  Otherwise, if descaddr is out of range,
+     * raise AddressSizeFault.
+     */
+    if (outputsize > 48) {
+        if (param.ds) {
+            descaddr |= extract64(descriptor, 8, 2) << 50;
+        } else {
+            descaddr |= extract64(descriptor, 12, 4) << 48;
+        }
+    } else if (descaddr >> outputsize) {
+        fi->type = ARMFault_AddressSize;
+        goto do_fault;
+    }
+
+    if ((descriptor & 2) && (level < 3)) {
+        /*
+         * Table entry. The top five bits are attributes which may
+         * propagate down through lower levels of the table (and
+         * which are all arranged so that 0 means "no effect", so
+         * we can gather them up by ORing in the bits at each level).
+         */
+        tableattrs |= extract64(descriptor, 59, 5);
+        level++;
+        indexmask = indexmask_grainsize;
+        goto next_level;
+    }
+
+    /*
+     * Block entry at level 1 or 2, or page entry at level 3.
+     * These are basically the same thing, although the number
+     * of bits we pull in from the vaddr varies. Note that although
+     * descaddrmask masks enough of the low bits of the descriptor
+     * to give a correct page or table address, the address field
+     * in a block descriptor is smaller; so we need to explicitly
+     * clear the lower bits here before ORing in the low vaddr bits.
+     *
+     * Afterward, descaddr is the final physical address.
+     */
+    page_size = (1ULL << ((stride * (4 - level)) + 3));
+    descaddr &= ~(hwaddr)(page_size - 1);
+    descaddr |= (address & (page_size - 1));
+
+    if (likely(!ptw->in_debug)) {
+        /*
+         * Access flag.
+         * If HA is enabled, prepare to update the descriptor below.
+         * Otherwise, pass the access fault on to software.
+         */
+        if (!(descriptor & (1 << 10))) {
+            if (param.ha) {
+                new_descriptor |= 1 << 10; /* AF */
+            } else {
+                fi->type = ARMFault_AccessFlag;
+                goto do_fault;
+            }
+        }
+
+        /*
+         * Dirty Bit.
+         * If HD is enabled, pre-emptively set/clear the appropriate AP/S2AP
+         * bit for writeback. The actual write protection test may still be
+         * overridden by tableattrs, to be merged below.
+         */
+        if (param.hd
+            && extract64(descriptor, 51, 1)  /* DBM */
+            && access_type == MMU_DATA_STORE) {
+            if (regime_is_stage2(mmu_idx)) {
+                new_descriptor |= 1ull << 7;    /* set S2AP[1] */
+            } else {
+                new_descriptor &= ~(1ull << 7); /* clear AP[2] */
+            }
+        }
+    }
+
+    /*
+     * Extract attributes from the (modified) descriptor, and apply
+     * table descriptors. Stage 2 table descriptors do not include
+     * any attribute fields. HPD disables all the table attributes
+     * except NSTable (which we have already handled).
+     */
+    attrs = new_descriptor & (MAKE_64BIT_MASK(2, 10) | MAKE_64BIT_MASK(50, 14));
+    if (!regime_is_stage2(mmu_idx)) {
+        if (!param.hpd) {
+            attrs |= extract64(tableattrs, 0, 2) << 53;     /* XN, PXN */
+            /*
+             * The sense of AP[1] vs APTable[0] is reversed, as APTable[0] == 1
+             * means "force PL1 access only", which means forcing AP[1] to 0.
+             */
+            attrs &= ~(extract64(tableattrs, 2, 1) << 6); /* !APT[0] => AP[1] */
+            attrs |= extract32(tableattrs, 3, 1) << 7;    /* APT[1] => AP[2] */
+        }
+    }
+
+    ap = extract32(attrs, 6, 2);
+    out_space = ptw->in_space;
+    if (regime_is_stage2(mmu_idx)) {
+        /*
+         * R_GYNXY: For stage2 in Realm security state, bit 55 is NS.
+         * The bit remains ignored for other security states.
+         * R_YMCSL: Executing an insn fetched from non-Realm causes
+         * a stage2 permission fault.
+         */
+        if (out_space == ARMSS_Realm && extract64(attrs, 55, 1)) {
+            out_space = ARMSS_NonSecure;
+            result->f.prot = get_S2prot_noexecute(ap);
+        } else {
+            xn = extract64(attrs, 53, 2);
+            result->f.prot = get_S2prot(env, ap, xn, ptw->in_s1_is_el0);
+        }
+    } else {
+        int nse, ns = extract32(attrs, 5, 1);
+        switch (out_space) {
+        case ARMSS_Root:
+            /*
+             * R_GVZML: Bit 11 becomes the NSE field in the EL3 regime.
+             * R_XTYPW: NSE and NS together select the output pa space.
+             */
+            nse = extract32(attrs, 11, 1);
+            out_space = (nse << 1) | ns;
+            if (out_space == ARMSS_Secure &&
+                !cpu_isar_feature(aa64_sel2, cpu)) {
+                out_space = ARMSS_NonSecure;
+            }
+            break;
+        case ARMSS_Secure:
+            if (ns) {
+                out_space = ARMSS_NonSecure;
+            }
+            break;
+        case ARMSS_Realm:
+            switch (mmu_idx) {
+            case ARMMMUIdx_Stage1_E0:
+            case ARMMMUIdx_Stage1_E1:
+            case ARMMMUIdx_Stage1_E1_PAN:
+                /* I_CZPRF: For Realm EL1&0 stage1, NS bit is RES0. */
+                break;
+            case ARMMMUIdx_E2:
+            case ARMMMUIdx_E20_0:
+            case ARMMMUIdx_E20_2:
+            case ARMMMUIdx_E20_2_PAN:
+                /*
+                 * R_LYKFZ, R_WGRZN: For Realm EL2 and EL2&1,
+                 * NS changes the output to non-secure space.
+                 */
+                if (ns) {
+                    out_space = ARMSS_NonSecure;
+                }
+                break;
+            default:
+                g_assert_not_reached();
+            }
+            break;
+        case ARMSS_NonSecure:
+            /* R_QRMFF: For NonSecure state, the NS bit is RES0. */
+            break;
+        default:
+            g_assert_not_reached();
+        }
+        xn = extract64(attrs, 54, 1);
+        pxn = extract64(attrs, 53, 1);
+
+        if (el == 1 && nv_nv1_enabled(env, ptw)) {
+            /*
+             * With FEAT_NV, when HCR_EL2.{NV,NV1} == {1,1}, the block/page
+             * descriptor bit 54 holds PXN, 53 is RES0, and the effective value
+             * of UXN is 0. Similarly for bits 59 and 60 in table descriptors
+             * (which we have already folded into bits 53 and 54 of attrs).
+             * AP[1] (descriptor bit 6, our ap bit 0) is treated as 0.
+             * Similarly, APTable[0] from the table descriptor is treated as 0;
+             * we already folded this into AP[1] and squashing that to 0 does
+             * the right thing.
+             */
+            pxn = xn;
+            xn = 0;
+            ap &= ~1;
+        }
+        /*
+         * Note that we modified ptw->in_space earlier for NSTable, but
+         * result->f.attrs retains a copy of the original security space.
+         */
+        result->f.prot = get_S1prot(env, mmu_idx, aarch64, ap, xn, pxn,
+                                    result->f.attrs.space, out_space);
+    }
+
+    if (!(result->f.prot & (1 << access_type))) {
+        fi->type = ARMFault_Permission;
+        goto do_fault;
+    }
+
+    /* If FEAT_HAFDBS has made changes, update the PTE. */
+    if (new_descriptor != descriptor) {
+        new_descriptor = arm_casq_ptw_crca(env, descriptor, new_descriptor, ptw, fi);
         if (fi->type != ARMFault_None) {
             goto do_fault;
         }
@@ -4193,6 +4993,143 @@ static bool get_phys_addr_nogpc(CPUARMState *env, S1Translate *ptw,
 }
 
 
+static bool get_phys_addr_nogpc_crca(CPUARMState *env, S1Translate *ptw,
+                                      target_ulong address,
+                                      MMUAccessType access_type,
+                                      GetPhysAddrResult *result,
+                                      ARMMMUFaultInfo *fi)
+{
+    ARMMMUIdx mmu_idx = ptw->in_mmu_idx;
+    ARMMMUIdx s1_mmu_idx;
+
+    /*
+     * The page table entries may downgrade Secure to NonSecure, but
+     * cannot upgrade a NonSecure translation regime's attributes
+     * to Secure or Realm.
+     */
+    result->f.attrs.space = ptw->in_space;
+    result->f.attrs.secure = arm_space_is_secure(ptw->in_space);
+
+    switch (mmu_idx) {
+    case ARMMMUIdx_Phys_S:
+    case ARMMMUIdx_Phys_NS:
+    case ARMMMUIdx_Phys_Root:
+    case ARMMMUIdx_Phys_Realm:
+        /* Checking Phys early avoids special casing later vs regime_el. */
+        return get_phys_addr_disabled(env, ptw, address, access_type,
+                                      result, fi);
+
+    case ARMMMUIdx_Stage1_E0:
+    case ARMMMUIdx_Stage1_E1:
+    case ARMMMUIdx_Stage1_E1_PAN:
+        /*
+         * First stage lookup uses second stage for ptw; only
+         * Secure has both S and NS IPA and starts with Stage2_S.
+         */
+        ptw->in_ptw_idx = (ptw->in_space == ARMSS_Secure) ?
+            ARMMMUIdx_Stage2_S : ARMMMUIdx_Stage2;
+        break;
+
+    case ARMMMUIdx_Stage2:
+    case ARMMMUIdx_Stage2_S:
+        /*
+         * Second stage lookup uses physical for ptw; whether this is S or
+         * NS may depend on the SW/NSW bits if this is a stage 2 lookup for
+         * the Secure EL2&0 regime.
+         */
+        ptw->in_ptw_idx = ptw_idx_for_stage_2(env, mmu_idx);
+        break;
+
+    case ARMMMUIdx_E10_0:
+        s1_mmu_idx = ARMMMUIdx_Stage1_E0;
+        goto do_twostage;
+    case ARMMMUIdx_E10_1:
+        s1_mmu_idx = ARMMMUIdx_Stage1_E1;
+        goto do_twostage;
+    case ARMMMUIdx_E10_1_PAN:
+        s1_mmu_idx = ARMMMUIdx_Stage1_E1_PAN;
+    do_twostage:
+        /*
+         * Call ourselves recursively to do the stage 1 and then stage 2
+         * translations if mmu_idx is a two-stage regime, and EL2 present.
+         * Otherwise, a stage1+stage2 translation is just stage 1.
+         */
+        ptw->in_mmu_idx = mmu_idx = s1_mmu_idx;
+        if (arm_feature(env, ARM_FEATURE_EL2) &&
+            !regime_translation_disabled(env, ARMMMUIdx_Stage2, ptw->in_space)) {
+            return get_phys_addr_twostage(env, ptw, address, access_type,
+                                          result, fi);
+        }
+        /* fall through */
+
+    default:
+        /* Single stage uses physical for ptw. */
+        ptw->in_ptw_idx = arm_space_to_phys(ptw->in_space);
+        break;
+    }
+
+    result->f.attrs.user = regime_is_user(env, mmu_idx);
+
+    /*
+     * Fast Context Switch Extension. This doesn't exist at all in v8.
+     * In v7 and earlier it affects all stage 1 translations.
+     */
+    if (address < 0x02000000 && mmu_idx != ARMMMUIdx_Stage2
+        && !arm_feature(env, ARM_FEATURE_V8)) {
+        if (regime_el(env, mmu_idx) == 3) {
+            address += env->cp15.fcseidr_s;
+        } else {
+            address += env->cp15.fcseidr_ns;
+        }
+    }
+
+    if (arm_feature(env, ARM_FEATURE_PMSA)) {
+        bool ret;
+        result->f.lg_page_size = TARGET_PAGE_BITS;
+
+        if (arm_feature(env, ARM_FEATURE_V8)) {
+            /* PMSAv8 */
+            ret = get_phys_addr_pmsav8(env, ptw, address, access_type,
+                                       result, fi);
+        } else if (arm_feature(env, ARM_FEATURE_V7)) {
+            /* PMSAv7 */
+            ret = get_phys_addr_pmsav7(env, ptw, address, access_type,
+                                       result, fi);
+        } else {
+            /* Pre-v7 MPU */
+            ret = get_phys_addr_pmsav5(env, ptw, address, access_type,
+                                       result, fi);
+        }
+        qemu_log_mask(CPU_LOG_MMU, "PMSA MPU lookup for %s at 0x%08" PRIx32
+                      " mmu_idx %u -> %s (prot %c%c%c)\n",
+                      access_type == MMU_DATA_LOAD ? "reading" :
+                      (access_type == MMU_DATA_STORE ? "writing" : "execute"),
+                      (uint32_t)address, mmu_idx,
+                      ret ? "Miss" : "Hit",
+                      result->f.prot & PAGE_READ ? 'r' : '-',
+                      result->f.prot & PAGE_WRITE ? 'w' : '-',
+                      result->f.prot & PAGE_EXEC ? 'x' : '-');
+
+        return ret;
+    }
+
+    /* Definitely a real MMU, not an MPU */
+
+    if (regime_translation_disabled(env, mmu_idx, ptw->in_space)) {
+        return get_phys_addr_disabled(env, ptw, address, access_type,
+                                      result, fi);
+    }
+
+    if (regime_using_lpae_format(env, mmu_idx)) {
+        return get_phys_addr_lpae_crca(env, ptw, address, access_type, result, fi);
+    } else if (arm_feature(env, ARM_FEATURE_V7) ||
+               regime_sctlr(env, mmu_idx) & SCTLR_XP) {
+        return get_phys_addr_v6(env, ptw, address, access_type, result, fi);
+    } else {
+        return get_phys_addr_v5(env, ptw, address, access_type, result, fi);
+    }
+}
+
 static bool get_phys_addr_nogpc_cc(CPUARMState *env, S1Translate *ptw,
                                       target_ulong address,
                                       MMUAccessType access_type,
@@ -4347,6 +5284,22 @@ static bool get_phys_addr_gpc(CPUARMState *env, S1Translate *ptw,
     return false;
 }
 
+static bool get_phys_addr_gpc_crca(CPUARMState *env, S1Translate *ptw,
+                              target_ulong address,
+                              MMUAccessType access_type,
+                              GetPhysAddrResult *result,
+                              ARMMMUFaultInfo *fi)
+{
+    if (get_phys_addr_nogpc_crca(env, ptw, address, access_type, result, fi)) {
+        return true;
+    }
+    if (!granule_protection_check(env, result->f.phys_addr,
+                                  result->f.attrs.space, fi)) {
+        fi->type = ARMFault_GPCFOnOutput;
+        return true;
+    }
+    return false;
+}
 static bool get_phys_addr_gpc_cc(CPUARMState *env, S1Translate *ptw,
                               target_ulong address,
                               MMUAccessType access_type,
@@ -4446,6 +5399,75 @@ bool get_phys_addr(CPUARMState *env, target_ulong address,
     return get_phys_addr_gpc(env, &ptw, address, access_type, result, fi);
 }
 
+
+bool get_phys_addr_crca(CPUARMState *env, target_ulong address,
+                   MMUAccessType access_type, ARMMMUIdx mmu_idx,
+                   GetPhysAddrResult *result, ARMMMUFaultInfo *fi)
+{
+    S1Translate ptw = {
+        .in_mmu_idx = mmu_idx,
+    };
+    ARMSecuritySpace ss;
+
+    switch (mmu_idx) {
+    case ARMMMUIdx_E10_0:
+    case ARMMMUIdx_E10_1:
+    case ARMMMUIdx_E10_1_PAN:
+    case ARMMMUIdx_E20_0:
+    case ARMMMUIdx_E20_2:
+    case ARMMMUIdx_E20_2_PAN:
+    case ARMMMUIdx_Stage1_E0:
+    case ARMMMUIdx_Stage1_E1:
+    case ARMMMUIdx_Stage1_E1_PAN:
+    case ARMMMUIdx_E2:
+        ss = arm_security_space_below_el3(env);
+        break;
+    case ARMMMUIdx_Stage2:
+        /*
+         * For Secure EL2, we need this index to be NonSecure;
+         * otherwise this will already be NonSecure or Realm.
+         */
+        ss = arm_security_space_below_el3(env);
+        if (ss == ARMSS_Secure) {
+            ss = ARMSS_NonSecure;
+        }
+        break;
+    case ARMMMUIdx_Phys_NS:
+    case ARMMMUIdx_MPrivNegPri:
+    case ARMMMUIdx_MUserNegPri:
+    case ARMMMUIdx_MPriv:
+    case ARMMMUIdx_MUser:
+        ss = ARMSS_NonSecure;
+        break;
+    case ARMMMUIdx_Stage2_S:
+    case ARMMMUIdx_Phys_S:
+    case ARMMMUIdx_MSPrivNegPri:
+    case ARMMMUIdx_MSUserNegPri:
+    case ARMMMUIdx_MSPriv:
+    case ARMMMUIdx_MSUser:
+        ss = ARMSS_Secure;
+        break;
+    case ARMMMUIdx_E3:
+        if (arm_feature(env, ARM_FEATURE_AARCH64) &&
+            cpu_isar_feature(aa64_rme, env_archcpu(env))) {
+            ss = ARMSS_Root;
+        } else {
+            ss = ARMSS_Secure;
+        }
+        break;
+    case ARMMMUIdx_Phys_Root:
+        ss = ARMSS_Root;
+        break;
+    case ARMMMUIdx_Phys_Realm:
+        ss = ARMSS_Realm;
+        break;
+    default:
+        g_assert_not_reached();
+    }
+
+    ptw.in_space = ss;
+    return get_phys_addr_gpc_crca(env, &ptw, address, access_type, result, fi);
+}
 
 bool get_phys_addr_cc(CPUARMState *env, target_ulong address,
                    MMUAccessType access_type, ARMMMUIdx mmu_idx,

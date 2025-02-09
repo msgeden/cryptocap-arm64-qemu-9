@@ -420,6 +420,13 @@ tlb_mask_table_ofs(TCGContext *s, int which)
             sizeof(CPUNegativeOffsetState));
 }
 
+static int __attribute__((unused))
+tlb_mask_table_ofs_crca(TCGContext *s, int which)
+{
+    return (offsetof(CPUNegativeOffsetState, tlb_crca.f[which]) -
+            sizeof(CPUNegativeOffsetState));
+}
+
 /* Signal overflow, starting over with fewer guest insns. */
 static G_NORETURN
 void tcg_raise_tb_overflow(TCGContext *s)
@@ -757,6 +764,10 @@ static const TCGTargetOpDef constraint_sets[] = {
 #ifndef CONFIG_TCG_INTERPRETER
 /* Validate CPUTLBDescFast placement. */
 QEMU_BUILD_BUG_ON((int)(offsetof(CPUNegativeOffsetState, tlb.f[0]) -
+                        sizeof(CPUNegativeOffsetState))
+                  < MIN_TLB_MASK_TABLE_OFS);
+
+QEMU_BUILD_BUG_ON((int)(offsetof(CPUNegativeOffsetState, tlb_crca.f[0]) -
                         sizeof(CPUNegativeOffsetState))
                   < MIN_TLB_MASK_TABLE_OFS);
 #endif

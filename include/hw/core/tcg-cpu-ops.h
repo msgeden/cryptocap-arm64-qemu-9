@@ -114,6 +114,7 @@ struct TCGCPUOps {
     bool (*cpu_exec_interrupt)(CPUState *cpu, int interrupt_request);
     /** @cpu_exec_halt: Callback for handling halt in cpu_exec */
     void (*cpu_exec_halt)(CPUState *cpu);
+
     /**
      * @tlb_fill: Handle a softmmu tlb miss
      *
@@ -125,6 +126,16 @@ struct TCGCPUOps {
                      MMUAccessType access_type, int mmu_idx,
                      bool probe, uintptr_t retaddr);
 
+    /**
+     * @tlb_fill_crca: Handle a softmmu tlb miss
+     *
+     * If the access is valid, call tlb_set_page and return true;
+     * if the access is invalid and probe is true, return false;
+     * otherwise raise an exception and do not return.
+     */
+    bool (*tlb_fill_crca)(CPUState *cpu, vaddr address, int size,
+                     MMUAccessType access_type, int mmu_idx,
+                     bool probe, uintptr_t retaddr);
     /**
      * @tlb_skip_cc: Handle a softmmu tlb skip for cryptocaps
      *

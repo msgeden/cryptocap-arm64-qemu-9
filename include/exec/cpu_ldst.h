@@ -126,6 +126,10 @@ typedef vaddr abi_ptr;
 #endif
 
 //#ifdef TARGET_CRYPTO_CAP
+uint32_t cpu_ldub_data_crca(CPUArchState *env, abi_ptr ptr);
+uint32_t cpu_ldub_data_ra_crca(CPUArchState *env, abi_ptr ptr, uintptr_t ra);
+
+
 uint32_t cpu_ldub_data_cc(CPUArchState *env, abi_ptr ptr);
 uint32_t cpu_ldub_data_ra_cc(CPUArchState *env, abi_ptr ptr, uintptr_t ra);
 //#endif
@@ -360,6 +364,7 @@ static inline uint64_t tlb_read_idx(const CPUTLBEntry *entry,
 #endif
 }
 
+
 static inline uint64_t tlb_read_idx_cc(const CPUTLBEntry *entry,
                                     MMUAccessType access_type)
 {
@@ -402,6 +407,15 @@ static inline uintptr_t tlb_index(CPUState *cpu, uintptr_t mmu_idx,
 }
 
 /* Find the TLB index corresponding to the mmu_idx + address pair.  */
+static inline uintptr_t tlb_index_crca(CPUState *cpu, uintptr_t mmu_idx,
+                                  vaddr addr)
+{
+    uintptr_t size_mask = cpu->neg.tlb_crca.f[mmu_idx].mask >> CPU_TLB_ENTRY_BITS;
+
+    return (addr >> TARGET_PAGE_BITS) & size_mask;
+}
+
+/* Find the TLB index corresponding to the mmu_idx + address pair.  */
 static inline uintptr_t tlb_index_cc(CPUState *cpu, uintptr_t mmu_idx,
                                   vaddr addr, CPUTLB* tlb_skipped)
 {
@@ -410,11 +424,19 @@ static inline uintptr_t tlb_index_cc(CPUState *cpu, uintptr_t mmu_idx,
     return (addr >> TARGET_PAGE_BITS) & size_mask;
 }
 
+
 /* Find the TLB entry corresponding to the mmu_idx + address pair.  */
 static inline CPUTLBEntry *tlb_entry(CPUState *cpu, uintptr_t mmu_idx,
                                      vaddr addr)
 {
     return &cpu->neg.tlb.f[mmu_idx].table[tlb_index(cpu, mmu_idx, addr)];
+}
+
+/* Find the TLB entry corresponding to the mmu_idx + address pair.  */
+static inline CPUTLBEntry *tlb_entry_crca(CPUState *cpu, uintptr_t mmu_idx,
+                                     vaddr addr)
+{
+    return &cpu->neg.tlb_crca.f[mmu_idx].table[tlb_index_crca(cpu, mmu_idx, addr)];
 }
 
 /* Find the TLB entry corresponding to the mmu_idx + address pair.  */
