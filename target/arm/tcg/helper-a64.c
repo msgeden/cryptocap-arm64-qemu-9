@@ -2498,7 +2498,9 @@ void HELPER(cldg)(CPUARMState *env, uint64_t size_idx, uint64_t r_idx, uint64_t 
     uint64_t lvalue=0;
     CCKey mkey=env->mkey;
     //intra-domain access
+    env->cc_tcrel1=env->cp15.tcr_el[1];
     if (!is_cross_domain(env, PT)){
+    //if (false){
         switch (size_idx){
             case 0:
                 lvalue = cpu_ldq_data(env, addr);
@@ -2535,21 +2537,19 @@ void HELPER(cldg)(CPUARMState *env, uint64_t size_idx, uint64_t r_idx, uint64_t 
         //env->pc=curr_pc;
         env->cc_access_ttbr0=env->cp15.ttbr0_ns;
         env->cc_ttbr0=PT;
-        env->cc_tcrel1=env->cp15.tcr_el[1];
-        uint64_t tcr_el1=env->cp15.tcr_el[1];
-        
-        uint64_t asid=PT;
-        asid>>=48;
-        asid<<=48;
-        //addr|=asid;
-        
-
         //E0PD0, bit [55] FEAT_E0PD:  Unprivileged access to any address translated by TTBR0_EL1 will not generate a fault by this mechanism.
         //HD, bit [40] FEAT_HAFDBS: Stage 1 hardware management of dirty state disabled.
         //HA, bit [39] FEAT_HAFDBS: Stage 1 Access flag update disabled.
         //EPD0, bit [7] Perform translation table walks using TTBR0_EL1.
+        uint64_t tcr_el1=env->cp15.tcr_el[1];
         tcr_el1&=0b1111111101111111111111100111111111111111111111111111111101111111;
         env->cp15.tcr_el[1]=tcr_el1;
+
+        //uint64_t asid=PT;
+        //asid>>=48;
+        //asid<<=48;
+        //addr|=asid;
+        
 
         // tlb_flush(env_cpu(env));
         // arm_rebuild_hflags(env);

@@ -222,14 +222,14 @@ static uint64_t regime_ttbr(CPUARMState *env, ARMMMUIdx mmu_idx, int ttbrn)
 {
 //#ifdef TARGET_CRYPTO_CAP
     //if (env->cc_access_flag){
-    if (env->cc_access_ttbr0 == env->cp15.ttbr0_ns && env->cc_access_pc == env->pc && ttbrn==0){
-    //if (env->cc_access_ttbr == env->cp15.ttbr1_ns && env->cc_access_pc == env->pc){
-        //env->cc_access_flag = false;
-        env->cc_access_pc=0;
-        env->cc_access_ttbr0=0; 
-        return env->cc_ttbr0;
-    }
-    else{
+    // if (env->cc_access_ttbr0 == env->cp15.ttbr0_ns && env->cc_access_pc == env->pc && ttbrn==0){
+    // //if (env->cc_access_ttbr == env->cp15.ttbr1_ns && env->cc_access_pc == env->pc){
+    //     //env->cc_access_flag = false;
+    //     env->cc_access_pc=0;
+    //     env->cc_access_ttbr0=0; 
+    //     return env->cc_ttbr0;
+    // }
+    // else{
 //#endif
         if (mmu_idx == ARMMMUIdx_Stage2) {
             return env->cp15.vttbr_el2;
@@ -243,7 +243,7 @@ static uint64_t regime_ttbr(CPUARMState *env, ARMMMUIdx mmu_idx, int ttbrn)
             return env->cp15.ttbr1_el[regime_el(env, mmu_idx)];
         }
 //#ifdef TARGET_CRYPTO_CAP
-    }
+//    }
 //#endif
 }
 
@@ -1287,6 +1287,34 @@ static bool get_level1_table_address(CPUARMState *env, ARMMMUIdx mmu_idx,
     return true;
 }
 
+
+static bool get_level1_table_address_crca(CPUARMState *env, ARMMMUIdx mmu_idx,
+                                     uint32_t *table, uint32_t address)
+{
+    /* Note that we can only get here for an AArch32 PL0/PL1 lookup */
+    uint64_t tcr = regime_tcr_crca(env, mmu_idx);
+    int maskshift = extract32(tcr, 0, 3);
+    uint32_t mask = ~(((uint32_t)0xffffffffu) >> maskshift);
+    uint32_t base_mask;
+
+    if (address & mask) {
+        if (tcr & TTBCR_PD1) {
+            /* Translation table walk disabled for TTBR1 */
+            return false;
+        }
+        *table = regime_ttbr_crca(env, mmu_idx, 1) & 0xffffc000;
+    } else {
+        if (tcr & TTBCR_PD0) {
+            /* Translation table walk disabled for TTBR0 */
+            return false;
+        }
+        base_mask = ~((uint32_t)0x3fffu >> maskshift);
+        *table = regime_ttbr_crca(env, mmu_idx, 0) & base_mask;
+    }
+    *table |= (address >> 18) & 0x3ffc;
+    return true;
+}
+
 /*
  * Translate section/page access permissions to page R/W protection flags
  * @env:         CPUARMState
@@ -1505,6 +1533,131 @@ do_fault:
     return true;
 }
 
+
+static bool get_phys_addr_v5_crca(CPUARMState *env, S1Translate *ptw,
+                             uint32_t address, MMUAccessType access_type,
+                             GetPhysAddrResult *result, ARMMMUFaultInfo *fi)
+{
+    int level = 1;
+    uint32_t table;
+    uint32_t desc;
+    int type;
+    int ap;
+    int domain = 0;
+    int domain_prot;
+    hwaddr phys_addr;
+    uint32_t dacr;
+
+    /* Pagetable walk.  */
+    /* Lookup l1 descriptor.  */
+    if (!get_level1_table_address_crca(env, ptw->in_mmu_idx, &table, address)) {
+        /* Section translation fault if page walk is disabled by PD0 or PD1 */
+        fi->type = ARMFault_Translation;
+        goto do_fault;
+    }
+    if (!S1_ptw_translate_crca(env, ptw, table, fi)) {
+        goto do_fault;
+    }
+    desc = arm_ldl_ptw(env, ptw, fi);
+    if (fi->type != ARMFault_None) {
+        goto do_fault;
+    }
+    type = (desc & 3);
+    domain = (desc >> 5) & 0x0f;
+    if (regime_el(env, ptw->in_mmu_idx) == 1) {
+        dacr = env->cp15.dacr_ns;
+    } else {
+        dacr = env->cp15.dacr_s;
+    }
+    domain_prot = (dacr >> (domain * 2)) & 3;
+    if (type == 0) {
+        /* Section translation fault.  */
+        fi->type = ARMFault_Translation;
+        goto do_fault;
+    }
+    if (type != 2) {
+        level = 2;
+    }
+    if (domain_prot == 0 || domain_prot == 2) {
+        fi->type = ARMFault_Domain;
+        goto do_fault;
+    }
+    if (type == 2) {
+        /* 1Mb section.  */
+        phys_addr = (desc & 0xfff00000) | (address & 0x000fffff);
+        ap = (desc >> 10) & 3;
+        result->f.lg_page_size = 20; /* 1MB */
+    } else {
+        /* Lookup l2 entry.  */
+        if (type == 1) {
+            /* Coarse pagetable.  */
+            table = (desc & 0xfffffc00) | ((address >> 10) & 0x3fc);
+        } else {
+            /* Fine pagetable.  */
+            table = (desc & 0xfffff000) | ((address >> 8) & 0xffc);
+        }
+        if (!S1_ptw_translate_crca(env, ptw, table, fi)) {
+            goto do_fault;
+        }
+        desc = arm_ldl_ptw(env, ptw, fi);
+        if (fi->type != ARMFault_None) {
+            goto do_fault;
+        }
+        switch (desc & 3) {
+        case 0: /* Page translation fault.  */
+            fi->type = ARMFault_Translation;
+            goto do_fault;
+        case 1: /* 64k page.  */
+            phys_addr = (desc & 0xffff0000) | (address & 0xffff);
+            ap = (desc >> (4 + ((address >> 13) & 6))) & 3;
+            result->f.lg_page_size = 16;
+            break;
+        case 2: /* 4k page.  */
+            phys_addr = (desc & 0xfffff000) | (address & 0xfff);
+            ap = (desc >> (4 + ((address >> 9) & 6))) & 3;
+            result->f.lg_page_size = 12;
+            break;
+        case 3: /* 1k page, or ARMv6/XScale "extended small (4k) page" */
+            if (type == 1) {
+                /* ARMv6/XScale extended small page format */
+                if (arm_feature(env, ARM_FEATURE_XSCALE)
+                    || arm_feature(env, ARM_FEATURE_V6)) {
+                    phys_addr = (desc & 0xfffff000) | (address & 0xfff);
+                    result->f.lg_page_size = 12;
+                } else {
+                    /*
+                     * UNPREDICTABLE in ARMv5; we choose to take a
+                     * page translation fault.
+                     */
+                    fi->type = ARMFault_Translation;
+                    goto do_fault;
+                }
+            } else {
+                phys_addr = (desc & 0xfffffc00) | (address & 0x3ff);
+                result->f.lg_page_size = 10;
+            }
+            ap = (desc >> 4) & 3;
+            break;
+        default:
+            /* Never happens, but compiler isn't smart enough to tell.  */
+            g_assert_not_reached();
+        }
+    }
+    result->f.prot = ap_to_rw_prot(env, ptw->in_mmu_idx, ap, domain_prot);
+    result->f.prot |= result->f.prot ? PAGE_EXEC : 0;
+    if (!(result->f.prot & (1 << access_type))) {
+        /* Access permission fault.  */
+        fi->type = ARMFault_Permission;
+        goto do_fault;
+    }
+    result->f.phys_addr = phys_addr;
+    return false;
+do_fault:
+    fi->domain = domain;
+    fi->level = level;
+    return true;
+}
+
 static bool get_phys_addr_v6(CPUARMState *env, S1Translate *ptw,
                              uint32_t address, MMUAccessType access_type,
                              GetPhysAddrResult *result, ARMMMUFaultInfo *fi)
@@ -1589,6 +1742,175 @@ static bool get_phys_addr_v6(CPUARMState *env, S1Translate *ptw,
         /* Lookup l2 entry.  */
         table = (desc & 0xfffffc00) | ((address >> 10) & 0x3fc);
         if (!S1_ptw_translate(env, ptw, table, fi)) {
+            goto do_fault;
+        }
+        desc = arm_ldl_ptw(env, ptw, fi);
+        if (fi->type != ARMFault_None) {
+            goto do_fault;
+        }
+        ap = ((desc >> 4) & 3) | ((desc >> 7) & 4);
+        switch (desc & 3) {
+        case 0: /* Page translation fault.  */
+            fi->type = ARMFault_Translation;
+            goto do_fault;
+        case 1: /* 64k page.  */
+            phys_addr = (desc & 0xffff0000) | (address & 0xffff);
+            xn = desc & (1 << 15);
+            result->f.lg_page_size = 16;
+            break;
+        case 2: case 3: /* 4k page.  */
+            phys_addr = (desc & 0xfffff000) | (address & 0xfff);
+            xn = desc & 1;
+            result->f.lg_page_size = 12;
+            break;
+        default:
+            /* Never happens, but compiler isn't smart enough to tell.  */
+            g_assert_not_reached();
+        }
+    }
+    if (domain_prot == 3) {
+        result->f.prot = PAGE_READ | PAGE_WRITE | PAGE_EXEC;
+    } else {
+        if (pxn && !regime_is_user(env, mmu_idx)) {
+            xn = 1;
+        }
+        if (xn && access_type == MMU_INST_FETCH) {
+            fi->type = ARMFault_Permission;
+            goto do_fault;
+        }
+
+        if (arm_feature(env, ARM_FEATURE_V6K) &&
+                (regime_sctlr(env, mmu_idx) & SCTLR_AFE)) {
+            /* The simplified model uses AP[0] as an access control bit.  */
+            if ((ap & 1) == 0) {
+                /* Access flag fault.  */
+                fi->type = ARMFault_AccessFlag;
+                goto do_fault;
+            }
+            result->f.prot = simple_ap_to_rw_prot(env, mmu_idx, ap >> 1);
+            user_prot = simple_ap_to_rw_prot_is_user(ap >> 1, 1);
+        } else {
+            result->f.prot = ap_to_rw_prot(env, mmu_idx, ap, domain_prot);
+            user_prot = ap_to_rw_prot_is_user(env, mmu_idx, ap, domain_prot, 1);
+        }
+        if (result->f.prot && !xn) {
+            result->f.prot |= PAGE_EXEC;
+        }
+        if (!(result->f.prot & (1 << access_type))) {
+            /* Access permission fault.  */
+            fi->type = ARMFault_Permission;
+            goto do_fault;
+        }
+        if (regime_is_pan(env, mmu_idx) &&
+            !regime_is_user(env, mmu_idx) &&
+            user_prot &&
+            access_type != MMU_INST_FETCH) {
+            /* Privileged Access Never fault */
+            fi->type = ARMFault_Permission;
+            goto do_fault;
+        }
+    }
+    if (ns) {
+        /* The NS bit will (as required by the architecture) have no effect if
+         * the CPU doesn't support TZ or this is a non-secure translation
+         * regime, because the attribute will already be non-secure.
+         */
+        result->f.attrs.secure = false;
+        result->f.attrs.space = ARMSS_NonSecure;
+    }
+    result->f.phys_addr = phys_addr;
+    return false;
+do_fault:
+    fi->domain = domain;
+    fi->level = level;
+    return true;
+}
+
+
+static bool get_phys_addr_v6_crca(CPUARMState *env, S1Translate *ptw,
+                             uint32_t address, MMUAccessType access_type,
+                             GetPhysAddrResult *result, ARMMMUFaultInfo *fi)
+{
+    ARMCPU *cpu = env_archcpu(env);
+    ARMMMUIdx mmu_idx = ptw->in_mmu_idx;
+    int level = 1;
+    uint32_t table;
+    uint32_t desc;
+    uint32_t xn;
+    uint32_t pxn = 0;
+    int type;
+    int ap;
+    int domain = 0;
+    int domain_prot;
+    hwaddr phys_addr;
+    uint32_t dacr;
+    bool ns;
+    int user_prot;
+
+    /* Pagetable walk.  */
+    /* Lookup l1 descriptor.  */
+    if (!get_level1_table_address_crca(env, mmu_idx, &table, address)) {
+        /* Section translation fault if page walk is disabled by PD0 or PD1 */
+        fi->type = ARMFault_Translation;
+        goto do_fault;
+    }
+    if (!S1_ptw_translate_crca(env, ptw, table, fi)) {
+        goto do_fault;
+    }
+    desc = arm_ldl_ptw(env, ptw, fi);
+    if (fi->type != ARMFault_None) {
+        goto do_fault;
+    }
+    type = (desc & 3);
+    if (type == 0 || (type == 3 && !cpu_isar_feature(aa32_pxn, cpu))) {
+        /* Section translation fault, or attempt to use the encoding
+         * which is Reserved on implementations without PXN.
+         */
+        fi->type = ARMFault_Translation;
+        goto do_fault;
+    }
+    if ((type == 1) || !(desc & (1 << 18))) {
+        /* Page or Section.  */
+        domain = (desc >> 5) & 0x0f;
+    }
+    if (regime_el(env, mmu_idx) == 1) {
+        dacr = env->cp15.dacr_ns;
+    } else {
+        dacr = env->cp15.dacr_s;
+    }
+    if (type == 1) {
+        level = 2;
+    }
+    domain_prot = (dacr >> (domain * 2)) & 3;
+    if (domain_prot == 0 || domain_prot == 2) {
+        /* Section or Page domain fault */
+        fi->type = ARMFault_Domain;
+        goto do_fault;
+    }
+    if (type != 1) {
+        if (desc & (1 << 18)) {
+            /* Supersection.  */
+            phys_addr = (desc & 0xff000000) | (address & 0x00ffffff);
+            phys_addr |= (uint64_t)extract32(desc, 20, 4) << 32;
+            phys_addr |= (uint64_t)extract32(desc, 5, 4) << 36;
+            result->f.lg_page_size = 24;  /* 16MB */
+        } else {
+            /* Section.  */
+            phys_addr = (desc & 0xfff00000) | (address & 0x000fffff);
+            result->f.lg_page_size = 20;  /* 1MB */
+        }
+        ap = ((desc >> 10) & 3) | ((desc >> 13) & 4);
+        xn = desc & (1 << 4);
+        pxn = desc & 1;
+        ns = extract32(desc, 19, 1);
+    } else {
+        if (cpu_isar_feature(aa32_pxn, cpu)) {
+            pxn = (desc >> 2) & 1;
+        }
+        ns = extract32(desc, 3, 1);
+        /* Lookup l2 entry.  */
+        table = (desc & 0xfffffc00) | ((address >> 10) & 0x3fc);
+        if (!S1_ptw_translate_crca(env, ptw, table, fi)) {
             goto do_fault;
         }
         desc = arm_ldl_ptw(env, ptw, fi);
@@ -5124,9 +5446,9 @@ static bool get_phys_addr_nogpc_crca(CPUARMState *env, S1Translate *ptw,
         return get_phys_addr_lpae_crca(env, ptw, address, access_type, result, fi);
     } else if (arm_feature(env, ARM_FEATURE_V7) ||
                regime_sctlr(env, mmu_idx) & SCTLR_XP) {
-        return get_phys_addr_v6(env, ptw, address, access_type, result, fi);
+        return get_phys_addr_v6_crca(env, ptw, address, access_type, result, fi);
     } else {
-        return get_phys_addr_v5(env, ptw, address, access_type, result, fi);
+        return get_phys_addr_v5_crca(env, ptw, address, access_type, result, fi);
     }
 }
 
