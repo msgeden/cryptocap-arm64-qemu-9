@@ -2567,6 +2567,7 @@ void HELPER(cldg)(CPUARMState *env, uint64_t size_idx, uint64_t r_idx, uint64_t 
             case 3:
                 lvalue = cpu_ldub_data_crca(env, addr);
                 //lvalue = cpu_ldub_data(env, addr);
+                //lvalue = cpu_ldub_data_cc(env, addr);
                 break;
             default:
                 lvalue = cpu_ldq_data(env, addr);
@@ -2688,9 +2689,11 @@ void HELPER(cjmp)(CPUARMState *env)
 void HELPER(dcall)(CPUARMState *env, uint64_t curr_pc)
 {
     CPUARMState* state=env;
+    
     //restore existing values to link capability register
     env->dclr.FIELD[0]=curr_pc+4; //save caller's return address
-    env->dclr.FIELD[1]=env->sp_el[0]; //save caller's SP
+    //env->dclr.FIELD[1]=env->sp_el[0]; //save caller's SP
+    env->dclr.FIELD[1]=env->xregs[31]; //save caller's SP
     env->dclr.FIELD[2]=env->cp15.ttbr0_ns; //save caller's TTBR_EL1
     env->dclr.FIELD[3]=env->cp15.ttbr1_ns; //save caller's TTBR1_EL1
     env->dclr.FIELD[4]=env->cp15.tpidr_el[1]; //save caller's TPIDR_EL1 (caller task_struct in a patched Linux)
@@ -2701,11 +2704,13 @@ void HELPER(dcall)(CPUARMState *env, uint64_t curr_pc)
     env->dclr.FIELD[8]=env->cp15.tcr_el[1]; //save caller's TCR_EL1
     env->dclr.FIELD[9]=env->cp15.sctlr_el[1]; //save caller's SCTLR_EL1
     env->dclr.FIELD[10]=env->cp15.mair_el[1]; //save caller's MAIR_EL1
+    //env->dclr.FIELD[10]=env->xregs[31]; //save caller's X31
 
     //update target values using capability target register (DCLC)
     env->pc=env->dclc.FIELD[0]; //set to callee PC
-    env->sp_el[0]=env->dclc.FIELD[1]; //set to callee SP
     env->xregs[31]=env->dclc.FIELD[1]; //set to callee SP
+    
+    //env->sp_el[0]=env->dclc.FIELD[1]; //set to callee SP
     env->cp15.ttbr0_ns=env->dclc.FIELD[2]; //set to callee TTBR0_EL1
     env->cp15.ttbr1_ns=env->dclc.FIELD[3]; //set to callee TTBR1_EL1
     env->cp15.tpidr_el[1]=env->dclc.FIELD[4]; //set to callee TPIDR_EL1 (callee task_struct in a patched Linux) 
@@ -2713,13 +2718,15 @@ void HELPER(dcall)(CPUARMState *env, uint64_t curr_pc)
     env->cp15.tpidr_el[0]=env->dclc.FIELD[6]; //set to callee TPIDR_EL0
     env->cp15.tpidrro_el[0]=env->dclc.FIELD[7]; //set to callee TPIDRRO_EL0
     
-    // env->cp15.tcr_el[1]=env->dclc.FIELD[8]; //set to callee TCR_EL1
-    // env->cp15.sctlr_el[1]=env->dclc.FIELD[9]; //set to callee SCTLR_EL1
-    // env->cp15.mair_el[1]=env->dclc.FIELD[10]; //set to callee MAIR_EL1
-
+    env->cp15.tcr_el[1]=env->dclc.FIELD[8]; //set to callee TCR_EL1
+    env->cp15.sctlr_el[1]=env->dclc.FIELD[9]; //set to callee SCTLR_EL1
+    env->cp15.mair_el[1]=env->dclc.FIELD[10]; //set to callee MAIR_EL1
+    //env->xregs[31]=env->dclc.FIELD[10]; //set to callee SP
+    
     tlb_flush(env_cpu(env));
     tlb_flush_crca(env_cpu(env));
     arm_rebuild_hflags(env);
+
     return;
 }
     
@@ -2728,7 +2735,8 @@ void HELPER(dret)(CPUARMState *env)
     CPUARMState* state=env;
     //update return values using capability link register (DCLR)
     env->pc=env->dclr.FIELD[0]; //restore caller's PC 
-    env->sp_el[0]=env->dclr.FIELD[1]; //restore caller's SP
+    //env->sp_el[0]=env->dclr.FIELD[1]; //restore caller's SP
+    env->xregs[31]=env->dclr.FIELD[1]; //restore caller's SP
     env->cp15.ttbr0_ns=env->dclr.FIELD[2]; //restore caller's TTBR0_EL1
     env->cp15.ttbr1_ns=env->dclr.FIELD[3]; //restore caller's TTBR1_EL1
     //callee's task_struct for Linux patched for the swap of tpidr_el1-sp_el0 
@@ -2737,9 +2745,11 @@ void HELPER(dret)(CPUARMState *env)
     env->cp15.tpidr_el[0]=env->dclr.FIELD[6]; //restore TPIDR_EL0 
     env->cp15.tpidrro_el[0]=env->dclr.FIELD[7]; //restore TPIDRRO_EL0
 
-    // env->cp15.tcr_el[1]=env->dclr.FIELD[8]; //restore to callee TCR_EL1
-    // env->cp15.sctlr_el[1]=env->dclr.FIELD[9]; //restore to callee SCTLR_EL1
-    // env->cp15.mair_el[1]=env->dclr.FIELD[10]; //restore to callee MAIR_EL1
+    env->cp15.tcr_el[1]=env->dclr.FIELD[8]; //restore to callee TCR_EL1
+    env->cp15.sctlr_el[1]=env->dclr.FIELD[9]; //restore to callee SCTLR_EL1
+    env->cp15.mair_el[1]=env->dclr.FIELD[10]; //restore to callee MAIR_EL1
+    //env->xregs[31]=env->dclr.FIELD[10]; //restore caller's SP
+    
 
     tlb_flush(env_cpu(env));
     tlb_flush_crca(env_cpu(env));
