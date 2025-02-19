@@ -2528,7 +2528,7 @@ static bool trans_CLDCL(DisasContext *s, arg_CLDCL *a)
         tcg_gen_st_i64(tmp12, tcg_env, offsetof(CPUARMState, dclc.FIELD[11]));
     }
     else if (a->cc==5){
-
+        
          //1
         tcg_gen_qemu_ld_i64(tmp1, addr, get_mem_index(s), MO_64);
         tcg_gen_st_i64(tmp1, tcg_env, offsetof(CPUARMState, dclr.FIELD[0]));
