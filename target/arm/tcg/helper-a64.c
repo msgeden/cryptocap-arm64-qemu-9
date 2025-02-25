@@ -2753,4 +2753,24 @@ void HELPER(dret)(CPUARMState *env)
 
     return;
 }
+
+void HELPER(dgrant)(CPUARMState *env, uint64_t pc, uint64_t sp)
+{
+    CPUARMState* state=env;
+    env->dclc.FIELD[0]=pc; //save target PC
+    env->dclc.FIELD[1]=sp; //save target SP
+    
+    env->dclc.FIELD[2]=env->cp15.ttbr0_ns; //save caller's TTBR_EL1
+    env->dclc.FIELD[3]=env->cp15.ttbr1_ns; //save caller's TTBR1_EL1
+    env->dclc.FIELD[4]=env->cp15.tpidr_el[1]; //save caller's TPIDR_EL1 (caller task_struct in a patched Linux)
+    env->dclc.FIELD[5]=env->pstate; //save caller's existing pstate
+    env->dclc.FIELD[6]=env->cp15.tpidr_el[0]; //save caller's TPIDR_EL0
+    env->dclc.FIELD[7]=env->cp15.tpidrro_el[0]; //save caller's TPIDRRO_EL0
+   
+    //env->dclc.FIELD[8]=env->cp15.tcr_el[1]; //save caller's TCR_EL1
+    //env->dclc.FIELD[9]=env->cp15.sctlr_el[1]; //save caller's SCTLR_EL1
+    //env->dclc.FIELD[10]=env->cp15.mair_el[1]; //save caller's MAIR_EL1
+
+    return;
+}
 //#endif

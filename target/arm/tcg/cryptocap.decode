@@ -38,6 +38,8 @@
 &cc cc
 &crd_rs1_rs2 crd rs1 rs2  
 &crd_imm crd imm
+&rs1_rs2 rs1 rs2
+
 
 #OPERATION TYPES
 @op_idx_rw_crd_rs       ... .... ..... ..... . idx:3 rw:1 crd:5 rs:5 &idx_rw_crd_rs
@@ -56,6 +58,8 @@
 @op_cc                  ... .... ..... ..... ..... ..... .. cc:3 &cc
 @op_crd_rs1_rs2         ... .... ..... ..... crd:5 rs1:5 rs2:5 &crd_rs1_rs2
 @op_crd_imm             ... .... ..... ..... ..... crd:5 imm:5 &crd_imm
+@op_rs1_rs2             ... .... ..... ..... ..... rs1:5 rs2:5 &rs1_rs2
+
 
 #CAPABILITY MANIPULATION INSTRUCTIONS
 #a generic capability register manipulation instruction based on index (idx)
@@ -112,3 +116,4 @@ CSTCL       000 0001 11010 00000 00000 00 ... ..... @op_cc_r
 #EL0 -> EL1 with predefined SYCALL_ID
 DCALL       000 0001 11101 00000 00000 00000 00000  @op_nill
 DRET        000 0001 11110 00000 00000 00000 00000  @op_nill
+DGRANT      000 0001 11111 00000 00000 ..... .....  @op_rs1_rs2

@@ -156,4 +156,6 @@ DEF_HELPER_1(cjmp, void, env)
 //DEF_HELPER_9(dcall, void, env, i64, i64, i64, i64, i64, i64, i64, i64)
 DEF_HELPER_2(dcall, void, env, i64)
 DEF_HELPER_1(dret, void, env)
+DEF_HELPER_3(dgrant, void, env, i64, i64)
+
 // //endif

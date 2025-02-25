@@ -2019,6 +2019,19 @@ static bool trans_DRET(DisasContext *s, arg_DRET *a)
     return true;
 }
 
+static bool trans_DGRANT(DisasContext *s, arg_DGRANT *a)
+{
+    TCGv_i64 pc = tcg_temp_new_i64();
+    tcg_gen_mov_i64(pc, cpu_reg(s, a->rs1));
+
+    TCGv_i64 sp = tcg_temp_new_i64();
+    tcg_gen_mov_i64(sp, cpu_reg(s, a->rs2));
+
+    gen_helper_dgrant(tcg_env, pc, sp);
+    
+    return true;
+}
+
 static bool trans_CMOVCL(DisasContext *s, arg_CMOVCL *a)
 {
     if (a->rw==0){
